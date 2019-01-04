@@ -17,7 +17,7 @@ initialModel =
 
 
 type alias Model =
-    ( List Float, State )
+    ( List (Maybe Float), State )
 
 
 type State
@@ -42,10 +42,10 @@ update msg model =
 
         ( Tap answer, ( h, Ready t correct ) ) ->
             ( ( (if answer == correct then
-                    t
+                    Just t
 
                  else
-                    1000
+                    Nothing
                 )
                     :: h
               , Done t correct answer
@@ -104,9 +104,17 @@ box isActive =
         ]
 
 
-average : List Float -> Float
+average : List (Maybe Float) -> Float
 average xs =
-    List.foldr (+) 0 xs |> (\x -> x / toFloat (List.length xs))
+    xs
+        |> List.filterMap identity
+        |> List.foldr (+) 0
+        |> (\x -> x / toFloat (List.length xs))
+
+
+counts : List (Maybe Float) -> ( Int, Int )
+counts =
+    List.partition ((==) Nothing) >> (\( a, b ) -> ( List.length a, List.length b ))
 
 
 view : Model -> Html Msg
@@ -114,7 +122,7 @@ view ( history, state ) =
     case state of
         Done t i o ->
             div []
-                (div []
+                [ div []
                     [ text <|
                         if i == o then
                             "correct"
@@ -122,9 +130,9 @@ view ( history, state ) =
                         else
                             "WRONG"
                     ]
-                    :: div [] [ text <| (String.fromFloat (average history) ++ "ms") ]
-                    :: List.map (\x -> div [] [ text (String.fromFloat x ++ "ms") ]) history
-                )
+                , div [] [ text <| (String.fromFloat (average history) ++ "ms") ]
+                , div [] [ text <| (\( e, c ) -> String.fromInt (c - e) ++ "/" ++ String.fromInt c) <| counts history ]
+                ]
 
         Ready _ i ->
             div [ style "flex-direction" "row", style "display" "flex" ] [ box (i == 0), box (i == 1), spacer, box (i == 2), box (i == 3) ]
