@@ -153,11 +153,34 @@ view ( history, state ) =
             []
             [ div [ style "flex-direction" "row", style "display" "flex" ] (addSpacer (List.map box colors))
             , div [ style "display" "flex", style "justify-content" "space-between", style "flex-direction" "row" ]
-                [ div [] [ text <| (String.fromFloat (average history) ++ "ms") ]
+                [ div [] [ text <| (pastDecimal 1 (String.fromFloat (average history)) ++ "ms") ]
                 , div [] [ text <| (\( e, c ) -> String.fromInt c ++ "/" ++ String.fromInt (c + e)) <| counts history ]
                 ]
             ]
         ]
+
+
+
+-- Drop anything n characters after a period
+-- Note that for something like `pastDecimal 1 "3.0000000002"`
+-- this will not return "3"
+
+
+pastDecimal : Int -> String -> String
+pastDecimal n s =
+    let
+        go built str =
+            case str of
+                '.' :: t ->
+                    List.reverse built ++ '.' :: List.take n t
+
+                h :: t ->
+                    go (h :: built) t
+
+                [] ->
+                    List.reverse built
+    in
+    String.fromList <| go [] <| String.toList s
 
 
 sub : Model -> Sub Msg
