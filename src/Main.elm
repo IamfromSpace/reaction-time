@@ -180,7 +180,13 @@ sub ( _, state ) =
         Done _ _ _ ->
             onKeyDown
                 (Json.Decode.map
-                    (always Start)
+                    (\x ->
+                        if x == " " then
+                            Start
+
+                        else
+                            RandomFinger -1
+                    )
                     (field "key" string)
                 )
 
