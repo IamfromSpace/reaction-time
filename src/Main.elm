@@ -79,29 +79,17 @@ spacer =
         []
 
 
-box : Bool -> Html a
-box isActive =
+box : String -> Html a
+box color =
     div
         [ style "height" "100px"
         , style "width" "100px"
         , style "font-size" "100px"
         , style "text-align" "center"
-        , style "background-color"
-            (if isActive then
-                "green"
-
-             else
-                "white"
-            )
+        , style "background-color" color
         , style "border" "1px solid black"
         ]
-        [ text <|
-            if isActive then
-                "X"
-
-            else
-                ""
-        ]
+        []
 
 
 average : List (Maybe Float) -> Float
@@ -120,28 +108,56 @@ counts =
     List.partition ((==) Nothing) >> (\( a, b ) -> ( List.length a, List.length b ))
 
 
+addSpacer : List (Html a) -> List (Html a)
+addSpacer x =
+    case x of
+        a :: b :: t ->
+            a :: b :: spacer :: t
+
+        y ->
+            y
+
+
 view : Model -> Html Msg
 view ( history, state ) =
-    case state of
-        Done t i o ->
-            div []
-                [ div []
-                    [ text <|
-                        if i == o then
-                            "correct"
+    let
+        colors =
+            case state of
+                Done _ i o ->
+                    List.map
+                        (\x ->
+                            if i == o then
+                                "green"
 
-                        else
-                            "WRONG"
-                    ]
-                , div [] [ text <| (String.fromFloat (average history) ++ "ms") ]
-                , div [] [ text <| (\( e, c ) -> String.fromInt (c - e) ++ "/" ++ String.fromInt c) <| counts history ]
+                            else
+                                "red"
+                        )
+                        [ 0, 1, 2, 3 ]
+
+                Ready _ i ->
+                    List.map
+                        (\x ->
+                            if x == i then
+                                "green"
+
+                            else
+                                "white"
+                        )
+                        [ 0, 1, 2, 3 ]
+
+                _ ->
+                    [ "white", "white", "white", "white" ]
+    in
+    div [ style "display" "flex", style "justify-content" "center", style "align-items" "center", style "height" "100vh" ]
+        [ div
+            []
+            [ div [ style "flex-direction" "row", style "display" "flex" ] (addSpacer (List.map box colors))
+            , div [ style "display" "flex", style "justify-content" "space-between", style "flex-direction" "row" ]
+                [ div [] [ text <| (String.fromFloat (average history) ++ "ms") ]
+                , div [] [ text <| (\( e, c ) -> String.fromInt c ++ "/" ++ String.fromInt (c + e)) <| counts history ]
                 ]
-
-        Ready _ i ->
-            div [ style "flex-direction" "row", style "display" "flex" ] [ box (i == 0), box (i == 1), spacer, box (i == 2), box (i == 3) ]
-
-        _ ->
-            div [ style "flex-direction" "row", style "display" "flex" ] [ box False, box False, spacer, box False, box False ]
+            ]
+        ]
 
 
 sub : Model -> Sub Msg
