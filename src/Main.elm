@@ -148,7 +148,7 @@ view ( history, state ) =
                 _ ->
                     [ "white", "white", "white", "white" ]
     in
-    div [ style "display" "flex", style "justify-content" "center", style "align-items" "center", style "height" "100vh" ]
+    div [ style "display" "flex", style "justify-content" "center", style "align-items" "center", style "height" "90vh" ]
         [ div
             []
             [ div [ style "flex-direction" "row", style "display" "flex" ] (addSpacer (List.map box colors))
