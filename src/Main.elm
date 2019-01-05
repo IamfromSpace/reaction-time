@@ -106,10 +106,13 @@ box isActive =
 
 average : List (Maybe Float) -> Float
 average xs =
-    xs
-        |> List.filterMap identity
+    let
+        filtered =
+            List.filterMap identity xs
+    in
+    filtered
         |> List.foldr (+) 0
-        |> (\x -> x / toFloat (List.length xs))
+        |> (\x -> x / toFloat (List.length filtered))
 
 
 counts : List (Maybe Float) -> ( Int, Int )
