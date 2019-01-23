@@ -106,8 +106,8 @@ update msg { history, state, remainingCount } =
 spacer : Html a
 spacer =
     div
-        [ style "height" "100px"
-        , style "width" "50px"
+        [ style "height" "15vw"
+        , style "width" "5vw"
         ]
         []
 
@@ -115,9 +115,8 @@ spacer =
 box : String -> Html a
 box color =
     div
-        [ style "height" "100px"
-        , style "width" "100px"
-        , style "font-size" "100px"
+        [ style "height" "15vw"
+        , style "width" "15vw"
         , style "text-align" "center"
         , style "background-color" color
         , style "border" "1px solid black"
