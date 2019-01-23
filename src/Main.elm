@@ -152,7 +152,7 @@ addSpacer x =
 
 
 view : Model -> Html Msg
-view { history, state } =
+view { history, state, remainingCount } =
     let
         colors =
             case state of
@@ -186,7 +186,18 @@ view { history, state } =
             []
             [ div [ style "margin" "14px", style "font-size" "28px", style "display" "flex", style "justify-content" "center" ] [ text "Reaction Time Tester" ]
             , div [ style "flex-direction" "row", style "display" "flex" ] (addSpacer (List.map box colors))
-            , div [ style "display" "flex", style "justify-content" "space-between", style "flex-direction" "row" ]
+            , div
+                [ style "display" "flex"
+                , style "justify-content" "space-between"
+                , style "flex-direction" "row"
+                , style "color"
+                    (if remainingCount == 0 then
+                        "black"
+
+                     else
+                        "#00000000"
+                    )
+                ]
                 [ div [] [ text <| (pastDecimal 1 (String.fromFloat (average history)) ++ "ms") ]
                 , div [] [ text <| (\( e, c ) -> String.fromInt c ++ "/" ++ String.fromInt (c + e)) <| counts history ]
                 ]
