@@ -13,11 +13,14 @@ import Random exposing (generate, int)
 
 initialModel : Model
 initialModel =
-    ( [], Done 0 0 0 )
+    { history = [], state = Done 0 0 0, remainingCount = 80 }
 
 
 type alias Model =
-    ( List (Maybe Float), State )
+    { history : List (Maybe Float)
+    , state : State
+    , remainingCount : Int
+    }
 
 
 type State
@@ -34,40 +37,70 @@ type Msg
     | Tick Float
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case ( msg, model ) of
-        ( Start, ( h, Done _ _ _ ) ) ->
-            ( ( h, Countdown 1000 ), Cmd.none )
+type alias UpdateResult =
+    { next : State
+    , notifications : Maybe (Maybe Float)
+    , cmds : Cmd Msg
+    }
 
-        ( Tap answer, ( h, Ready t correct ) ) ->
-            ( ( (if answer == correct then
-                    Just t
 
-                 else
-                    Nothing
-                )
-                    :: h
-              , Done t correct answer
-              )
-            , Cmd.none
-            )
+updateState : Msg -> State -> UpdateResult
+updateState msg state =
+    case ( msg, state ) of
+        ( Start, Done _ _ _ ) ->
+            { next = Countdown 1000, notifications = Nothing, cmds = Cmd.none }
 
-        ( RandomFinger i, ( h, AwaitFinger ) ) ->
-            ( ( h, Ready 0 i ), Cmd.none )
+        ( Tap answer, Ready t correct ) ->
+            { next = Done t correct answer
+            , notifications =
+                Just <|
+                    if answer == correct then
+                        Just t
 
-        ( Tick dt, ( h, Countdown t ) ) ->
+                    else
+                        Nothing
+            , cmds = Cmd.none
+            }
+
+        ( RandomFinger i, AwaitFinger ) ->
+            { next = Ready 0 i, notifications = Nothing, cmds = Cmd.none }
+
+        ( Tick dt, Countdown t ) ->
             if t - dt <= 0 then
-                ( ( h, AwaitFinger ), generate RandomFinger (int 0 3) )
+                { next = AwaitFinger, notifications = Nothing, cmds = generate RandomFinger (int 0 3) }
 
             else
-                ( ( h, Countdown (t - dt) ), Cmd.none )
+                { next = Countdown (t - dt), notifications = Nothing, cmds = Cmd.none }
 
-        ( Tick dt, ( h, Ready t f ) ) ->
-            ( ( h, Ready (t + dt) f ), Cmd.none )
+        ( Tick dt, Ready t f ) ->
+            { next = Ready (t + dt) f, notifications = Nothing, cmds = Cmd.none }
 
         ( _, s ) ->
-            ( s, Cmd.none )
+            { next = s, notifications = Nothing, cmds = Cmd.none }
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg { history, state, remainingCount } =
+    let
+        { next, notifications, cmds } =
+            updateState msg state
+    in
+    case notifications of
+        Just m ->
+            ( { history = m :: history
+              , state =
+                    if remainingCount <= 1 then
+                        next
+
+                    else
+                        Countdown 1000
+              , remainingCount = remainingCount - 1
+              }
+            , cmds
+            )
+
+        Nothing ->
+            ( { history = history, state = next, remainingCount = remainingCount }, cmds )
 
 
 spacer : Html a
@@ -119,7 +152,7 @@ addSpacer x =
 
 
 view : Model -> Html Msg
-view ( history, state ) =
+view { history, state } =
     let
         colors =
             case state of
@@ -185,7 +218,7 @@ pastDecimal n s =
 
 
 sub : Model -> Sub Msg
-sub ( _, state ) =
+sub { state } =
     case state of
         Countdown _ ->
             onAnimationFrameDelta Tick
