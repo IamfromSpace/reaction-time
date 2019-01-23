@@ -4,8 +4,8 @@ import Browser exposing (element)
 import Browser.Events exposing (onAnimationFrameDelta, onKeyDown)
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (style)
-import Html.Events exposing (onClick)
-import Json.Decode exposing (field, string)
+import Html.Events exposing (onClick, preventDefaultOn)
+import Json.Decode exposing (field, string, succeed)
 import Platform.Cmd exposing (Cmd)
 import Platform.Sub exposing (Sub, batch)
 import Random exposing (generate, int)
@@ -103,23 +103,25 @@ update msg { history, state, remainingCount } =
             ( { history = history, state = next, remainingCount = remainingCount }, cmds )
 
 
-spacer : Html a
+spacer : Html Msg
 spacer =
     div
         [ style "height" "15vw"
         , style "width" "5vw"
+        , preventDefaultOn "touchstart" (succeed ( Start, True ))
         ]
         []
 
 
-box : String -> Html a
-box color =
+box : Msg -> String -> Html Msg
+box event color =
     div
         [ style "height" "15vw"
         , style "width" "15vw"
         , style "text-align" "center"
         , style "background-color" color
         , style "border" "1px solid black"
+        , preventDefaultOn "touchstart" (succeed ( event, True ))
         ]
         []
 
@@ -140,7 +142,7 @@ counts =
     List.partition ((==) Nothing) >> (\( a, b ) -> ( List.length a, List.length b ))
 
 
-addSpacer : List (Html a) -> List (Html a)
+addSpacer : List (Html Msg) -> List (Html Msg)
 addSpacer x =
     case x of
         a :: b :: t ->
@@ -184,7 +186,8 @@ view { history, state, remainingCount } =
         [ div
             []
             [ div [ style "margin" "14px", style "font-size" "28px", style "display" "flex", style "justify-content" "center" ] [ text "Reaction Time Tester" ]
-            , div [ style "flex-direction" "row", style "display" "flex" ] (addSpacer (List.map box colors))
+            , div [ style "flex-direction" "row", style "display" "flex" ]
+                (addSpacer (List.indexedMap (Tap >> box) colors))
             , div
                 [ style "display" "flex"
                 , style "justify-content" "space-between"
