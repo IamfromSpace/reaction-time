@@ -106,8 +106,8 @@ update msg { history, state, remainingCount } =
 spacer : Html Msg
 spacer =
     div
-        [ style "height" "15vw"
-        , style "width" "5vw"
+        [ style "height" "17.5vw"
+        , style "width" "10vw"
         , preventDefaultOn "touchstart" (succeed ( Start, True ))
         ]
         []
@@ -116,8 +116,8 @@ spacer =
 box : Msg -> String -> Html Msg
 box event color =
     div
-        [ style "height" "15vw"
-        , style "width" "15vw"
+        [ style "height" "17.5vw"
+        , style "width" "17.5vw"
         , style "text-align" "center"
         , style "background-color" color
         , style "border" "1px solid black"
