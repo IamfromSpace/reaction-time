@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -18,17 +17,26 @@ import           Network.AWS.DynamoDB.Types                (AttributeValue,
                                                             attributeValue, avN,
                                                             avS)
 
-import           Data.Aeson                                (FromJSON)
-import           GHC.Generics                              (Generic)
+import           Control.Monad                             (mzero)
+import           Data.Aeson                                (FromJSON,
+                                                            Value (Object),
+                                                            parseJSON, (.:))
 
 data RtResult = RtResult
   { averageSeconds :: Float
   , successCount   :: Int
   , testCount      :: Int
   , dateTime       :: UTCTime
-  } deriving Generic
+  }
 
-instance FromJSON RtResult
+instance FromJSON RtResult where
+  parseJSON (Object v) =
+    RtResult <$>
+    v .: "averageSeconds" <*>
+    v .: "successCount" <*>
+    v .: "testCount" <*>
+    (read <$> v .: "dateTime")
+  parseJSON _ = mzero
 
 putRtResult :: Text -> RtResult -> PutItem
 putRtResult tableName rtResult =
