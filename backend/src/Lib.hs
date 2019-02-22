@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -20,7 +21,9 @@ import           Network.AWS.DynamoDB.Types                (AttributeValue,
 import           Control.Monad                             (mzero)
 import           Data.Aeson                                (FromJSON,
                                                             Value (Object),
-                                                            parseJSON, (.:))
+                                                            decode, parseJSON,
+                                                            (.:))
+import           GHC.Generics                              (Generic)
 
 data RtResult = RtResult
   { averageSeconds :: Float
@@ -38,6 +41,13 @@ instance FromJSON RtResult where
     (read <$> v .: "dateTime")
   parseJSON _ = mzero
 
+data Tbd = Tbd
+  { tbd1 :: Text
+  , tbd2 :: Text
+  } deriving Generic
+
+instance FromJSON Tbd
+
 putRtResult :: Text -> RtResult -> PutItem
 putRtResult tableName rtResult =
   set piItem (toRtResultItem rtResult) (putItem tableName)
@@ -51,7 +61,21 @@ toRtResultItem RtResult { averageSeconds, successCount, testCount, dateTime } =
       , ("dateTimeUTC",  set avS (Just $ pack $ show dateTime) attributeValue)
       ]
 
-handler :: MonadAWS m => ApiGatewayProxyRequest RtResult -> m ApiGatewayProxyResponse
-handler ApiGatewayProxyRequest { body } = do
-  _ <- send (putRtResult "rt-tester" body)
-  return (ApiGatewayProxyResponse 200 mempty "Done")
+handler :: MonadAWS m => ApiGatewayProxyRequest -> m ApiGatewayProxyResponse
+handler ApiGatewayProxyRequest { body, httpMethod = "POST"} =
+  case decode body of
+    Just rtResult ->  do
+      _ <- send (putRtResult "rt-tester" rtResult)
+      return (ApiGatewayProxyResponse 200 mempty "Done")
+    Nothing ->
+      return (ApiGatewayProxyResponse 400 mempty "BadRequest")
+handler ApiGatewayProxyRequest { body, httpMethod = "PUT" } =
+  case decode body of
+    Just Tbd { tbd1 } ->
+      return (ApiGatewayProxyResponse 500 mempty tbd1)
+    Nothing ->
+      return (ApiGatewayProxyResponse 400 mempty "BadRequest")
+handler ApiGatewayProxyRequest { httpMethod = "GET" } =
+  return (ApiGatewayProxyResponse 500 mempty "Not Yet Implemented")
+handler _ =
+  return (ApiGatewayProxyResponse 405 mempty "Method Not Supported")

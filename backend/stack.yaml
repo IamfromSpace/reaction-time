@@ -40,7 +40,7 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
 - git: https://github.com/Nike-Inc/hal.git
-  commit: 36359212d8c189ea723f596fefaaadf488287761
+  commit: dcc97d903ac6e307d435882bba614cc40317b3ce
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
