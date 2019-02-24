@@ -3,24 +3,36 @@ module Main exposing (main)
 import Browser exposing (element)
 import Browser.Events exposing (onAnimationFrameDelta, onKeyDown)
 import Html exposing (Html, button, div, text)
-import Html.Attributes exposing (style)
+import Html.Attributes exposing (disabled, style)
 import Html.Events exposing (onClick, preventDefaultOn)
 import Json.Decode exposing (field, string, succeed)
+import Login
 import Platform.Cmd exposing (Cmd)
 import Platform.Sub exposing (Sub, batch)
 import Random exposing (generate, int)
 
 
+
+-- TODO: Fully break AppMsg and Msg into submodules
+
+
 initialModel : Model
 initialModel =
-    { history = [], state = Done 0 0 0, remainingCount = 80 }
+    { history = [], state = Done 0 0 0, remainingCount = 80, loginState = NotLoggedIn }
 
 
 type alias Model =
     { history : List (Maybe Float)
     , state : State
     , remainingCount : Int
+    , loginState : LoginState
     }
+
+
+type LoginState
+    = NotLoggedIn
+    | LoggingIn Login.Model
+    | LoggedIn String
 
 
 type State
@@ -35,6 +47,12 @@ type Msg
     | RandomFinger Int
     | Start
     | Tick Float
+
+
+type AppMsg
+    = TestMsg Msg
+    | LoginMsg Login.Msg
+    | StartLogin
 
 
 type alias UpdateResult =
@@ -79,28 +97,53 @@ updateState msg state =
             { next = s, notifications = Nothing, cmds = Cmd.none }
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg { history, state, remainingCount } =
-    let
-        { next, notifications, cmds } =
-            updateState msg state
-    in
-    case notifications of
-        Just m ->
-            ( { history = m :: history
-              , state =
-                    if remainingCount <= 1 then
-                        next
+update : AppMsg -> Model -> ( Model, Cmd AppMsg )
+update msg { history, state, remainingCount, loginState } =
+    case ( msg, loginState ) of
+        ( StartLogin, NotLoggedIn ) ->
+            ( { history = history, state = state, remainingCount = remainingCount, loginState = LoggingIn Login.initModel }, Cmd.none )
 
-                    else
-                        Countdown 1000
-              , remainingCount = remainingCount - 1
-              }
-            , cmds
+        ( LoginMsg m, LoggingIn x ) ->
+            let
+                ( ( next, cmds ), maybeNotifications ) =
+                    Login.update "1hc2128v5ffkeokim4uvbpjmj7" m x
+            in
+            case maybeNotifications of
+                Nothing ->
+                    ( { history = history, state = state, remainingCount = remainingCount, loginState = LoggingIn next }, Cmd.map LoginMsg cmds )
+
+                Just token ->
+                    ( { history = history, state = state, remainingCount = remainingCount, loginState = LoggedIn token }, Cmd.none )
+
+        ( TestMsg testMsg, _ ) ->
+            let
+                { next, notifications, cmds } =
+                    updateState testMsg state
+            in
+            case notifications of
+                Just m ->
+                    ( { history = m :: history
+                      , state =
+                            if remainingCount <= 1 then
+                                next
+
+                            else
+                                Countdown 1000
+                      , remainingCount = remainingCount - 1
+                      , loginState = loginState
+                      }
+                    , Cmd.map TestMsg cmds
+                    )
+
+                Nothing ->
+                    ( { history = history, state = next, remainingCount = remainingCount, loginState = loginState }
+                    , Cmd.map TestMsg cmds
+                    )
+
+        _ ->
+            ( { history = history, state = state, remainingCount = remainingCount, loginState = loginState }
+            , Cmd.none
             )
-
-        Nothing ->
-            ( { history = history, state = next, remainingCount = remainingCount }, cmds )
 
 
 spacer : Html Msg
@@ -152,59 +195,72 @@ addSpacer x =
             y
 
 
-view : Model -> Html Msg
-view { history, state, remainingCount } =
-    let
-        colors =
-            case state of
-                Done _ i o ->
-                    List.map
-                        (\x ->
-                            if i == o then
-                                "green"
+view : Model -> Html AppMsg
+view { history, state, remainingCount, loginState } =
+    case loginState of
+        LoggingIn m ->
+            Html.map LoginMsg (Login.view m)
 
-                            else
-                                "red"
-                        )
-                        [ 0, 1, 2, 3 ]
+        _ ->
+            let
+                colors =
+                    case state of
+                        Done _ i o ->
+                            List.map
+                                (\x ->
+                                    if i == o then
+                                        "green"
 
-                Ready _ i ->
-                    List.map
-                        (\x ->
-                            if x == i then
-                                "green"
+                                    else
+                                        "red"
+                                )
+                                [ 0, 1, 2, 3 ]
 
-                            else
-                                "white"
-                        )
-                        [ 0, 1, 2, 3 ]
+                        Ready _ i ->
+                            List.map
+                                (\x ->
+                                    if x == i then
+                                        "green"
 
-                _ ->
-                    [ "white", "white", "white", "white" ]
-    in
-    div [ style "display" "flex", style "justify-content" "center", style "align-items" "center", style "height" "90vh" ]
-        [ div
-            []
-            [ div [ style "margin" "14px", style "font-size" "28px", style "display" "flex", style "justify-content" "center" ] [ text "Reaction Time Tester" ]
-            , div [ style "flex-direction" "row", style "display" "flex" ]
-                (addSpacer (List.indexedMap (Tap >> box) colors))
-            , div
-                [ style "display" "flex"
-                , style "justify-content" "space-between"
-                , style "flex-direction" "row"
-                , style "color"
-                    (if remainingCount == 0 then
-                        "black"
+                                    else
+                                        "white"
+                                )
+                                [ 0, 1, 2, 3 ]
 
-                     else
-                        "#00000000"
-                    )
+                        _ ->
+                            [ "white", "white", "white", "white" ]
+            in
+            div [ style "display" "flex", style "justify-content" "center", style "align-items" "center", style "height" "90vh" ]
+                [ div
+                    []
+                    [ div [ style "margin" "14px", style "font-size" "28px", style "display" "flex", style "justify-content" "center" ] [ text "Reaction Time Tester" ]
+                    , Html.map TestMsg <|
+                        div [ style "flex-direction" "row", style "display" "flex" ]
+                            (addSpacer (List.indexedMap (Tap >> box) colors))
+                    , div
+                        [ style "display" "flex"
+                        , style "justify-content" "space-between"
+                        , style "flex-direction" "row"
+                        , style "color"
+                            (if remainingCount == 0 then
+                                "black"
+
+                             else
+                                "#00000000"
+                            )
+                        ]
+                        [ div [] [ text <| (pastDecimal 1 (String.fromFloat (average history)) ++ "ms") ]
+                        , div [] [ text <| (\( e, c ) -> String.fromInt c ++ "/" ++ String.fromInt (c + e)) <| counts history ]
+                        ]
+                    , case loginState of
+                        LoggedIn _ ->
+                            -- TODO: Submit
+                            button [ disabled (remainingCount /= 0) ] [ text "Submit" ]
+
+                        _ ->
+                            button [ onClick StartLogin ] [ text "Login" ]
+                    ]
                 ]
-                [ div [] [ text <| (pastDecimal 1 (String.fromFloat (average history)) ++ "ms") ]
-                , div [] [ text <| (\( e, c ) -> String.fromInt c ++ "/" ++ String.fromInt (c + e)) <| counts history ]
-                ]
-            ]
-        ]
 
 
 
@@ -280,11 +336,11 @@ sub { state } =
             Sub.none
 
 
-main : Program () Model Msg
+main : Program () Model AppMsg
 main =
     element
         { init = \_ -> ( initialModel, Cmd.none )
         , view = view
         , update = update
-        , subscriptions = sub
+        , subscriptions = Sub.map TestMsg << sub
         }

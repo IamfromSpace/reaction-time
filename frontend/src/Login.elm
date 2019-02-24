@@ -1,4 +1,4 @@
-module Login exposing (init, update, view)
+module Login exposing (Model, Msg, init, initModel, update, view)
 
 import Browser exposing (element)
 import CognitoClient exposing (login)
@@ -10,9 +10,14 @@ import Json.Decode exposing (field, string, succeed)
 import Platform.Cmd exposing (Cmd)
 
 
+initModel : Model
+initModel =
+    { email = "", password = "", loading = False, lastError = Nothing }
+
+
 init : ( Model, Cmd Msg )
 init =
-    ( { email = "", password = "", loading = False, lastError = Nothing }, Cmd.none )
+    ( initModel, Cmd.none )
 
 
 type alias Model =
