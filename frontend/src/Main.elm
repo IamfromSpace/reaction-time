@@ -10,6 +10,9 @@ import Login
 import Platform.Cmd exposing (Cmd)
 import Platform.Sub exposing (Sub, batch)
 import Random exposing (generate, int)
+import RtServerClient exposing (reportResult)
+import Task exposing (perform)
+import Time exposing (Posix, now)
 
 
 
@@ -53,6 +56,9 @@ type AppMsg
     = TestMsg Msg
     | LoginMsg Login.Msg
     | StartLogin
+    | Submit
+    | SubmitReady Posix
+    | ReceiveSubmitResult
 
 
 type alias UpdateResult =
@@ -139,6 +145,34 @@ update msg { history, state, remainingCount, loginState } =
                     ( { history = history, state = next, remainingCount = remainingCount, loginState = loginState }
                     , Cmd.map TestMsg cmds
                     )
+
+        ( Submit, _ ) ->
+            ( { history = history, state = state, remainingCount = remainingCount, loginState = loginState }
+            , if remainingCount == 0 then
+                perform SubmitReady now
+
+              else
+                Cmd.none
+            )
+
+        ( SubmitReady posix, LoggedIn token ) ->
+            let
+                ( errorCount, successCount ) =
+                    counts history
+            in
+            ( { history = history, state = state, remainingCount = remainingCount, loginState = loginState }
+              -- TODO: Don't just drop the error on the floor
+            , Cmd.map (always ReceiveSubmitResult) <|
+                reportResult
+                    -- TODO: Endpoint setup
+                    "https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/default/rt-tester"
+                    token
+                    { averageSeconds = average history
+                    , successCount = successCount
+                    , testCount = errorCount + successCount
+                    , dateTime = posix
+                    }
+            )
 
         _ ->
             ( { history = history, state = state, remainingCount = remainingCount, loginState = loginState }
@@ -254,8 +288,7 @@ view { history, state, remainingCount, loginState } =
                         ]
                     , case loginState of
                         LoggedIn _ ->
-                            -- TODO: Submit
-                            button [ disabled (remainingCount /= 0) ] [ text "Submit" ]
+                            button [ onClick Submit, disabled (remainingCount /= 0) ] [ text "Submit" ]
 
                         _ ->
                             button [ onClick StartLogin ] [ text "Login" ]
