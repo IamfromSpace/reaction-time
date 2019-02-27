@@ -10,7 +10,7 @@ import Login
 import Platform.Cmd exposing (Cmd)
 import Platform.Sub exposing (Sub, batch)
 import Random exposing (generate, int)
-import RtServerClient exposing (reportResult)
+import RtServerClient exposing (RtError(..), reportResult)
 import Task exposing (perform)
 import Time exposing (Posix, now)
 
@@ -21,7 +21,12 @@ import Time exposing (Posix, now)
 
 initialModel : Model
 initialModel =
-    { history = [], state = Done 0 0 0, remainingCount = 80, loginState = NotLoggedIn }
+    { history = []
+    , state = Done 0 0 0
+    , remainingCount = 80
+    , loginState = NotLoggedIn
+    , submitState = NotSubmitted
+    }
 
 
 type alias Model =
@@ -29,7 +34,15 @@ type alias Model =
     , state : State
     , remainingCount : Int
     , loginState : LoginState
+    , submitState : SubmitState
     }
+
+
+type SubmitState
+    = NotSubmitted
+    | Submitting
+    | Submitted
+    | SubmitError RtError
 
 
 type LoginState
@@ -58,7 +71,7 @@ type AppMsg
     | StartLogin
     | Submit
     | SubmitReady Posix
-    | ReceiveSubmitResult
+    | ReceiveSubmitResult (Maybe RtError)
 
 
 type alias UpdateResult =
@@ -104,10 +117,10 @@ updateState msg state =
 
 
 update : AppMsg -> Model -> ( Model, Cmd AppMsg )
-update msg { history, state, remainingCount, loginState } =
+update msg ({ history, state, remainingCount, loginState, submitState } as s) =
     case ( msg, loginState ) of
         ( StartLogin, NotLoggedIn ) ->
-            ( { history = history, state = state, remainingCount = remainingCount, loginState = LoggingIn Login.initModel }, Cmd.none )
+            ( { s | loginState = LoggingIn Login.initModel }, Cmd.none )
 
         ( LoginMsg m, LoggingIn x ) ->
             let
@@ -116,10 +129,10 @@ update msg { history, state, remainingCount, loginState } =
             in
             case maybeNotifications of
                 Nothing ->
-                    ( { history = history, state = state, remainingCount = remainingCount, loginState = LoggingIn next }, Cmd.map LoginMsg cmds )
+                    ( { s | loginState = LoggingIn next }, Cmd.map LoginMsg cmds )
 
                 Just token ->
-                    ( { history = history, state = state, remainingCount = remainingCount, loginState = LoggedIn token }, Cmd.none )
+                    ( { s | loginState = LoggedIn token }, Cmd.none )
 
         ( TestMsg testMsg, _ ) ->
             let
@@ -128,26 +141,24 @@ update msg { history, state, remainingCount, loginState } =
             in
             case notifications of
                 Just m ->
-                    ( { history = m :: history
-                      , state =
+                    ( { s
+                        | history = m :: history
+                        , state =
                             if remainingCount <= 1 then
                                 next
 
                             else
                                 Countdown 1000
-                      , remainingCount = remainingCount - 1
-                      , loginState = loginState
+                        , remainingCount = remainingCount - 1
                       }
                     , Cmd.map TestMsg cmds
                     )
 
                 Nothing ->
-                    ( { history = history, state = next, remainingCount = remainingCount, loginState = loginState }
-                    , Cmd.map TestMsg cmds
-                    )
+                    ( { s | state = next }, Cmd.map TestMsg cmds )
 
         ( Submit, _ ) ->
-            ( { history = history, state = state, remainingCount = remainingCount, loginState = loginState }
+            ( s
             , if remainingCount == 0 then
                 perform SubmitReady now
 
@@ -160,12 +171,11 @@ update msg { history, state, remainingCount, loginState } =
                 ( errorCount, successCount ) =
                     counts history
             in
-            ( { history = history, state = state, remainingCount = remainingCount, loginState = loginState }
-              -- TODO: Don't just drop the error on the floor
-            , Cmd.map (always ReceiveSubmitResult) <|
+            ( { s | submitState = Submitting }
+            , Cmd.map ReceiveSubmitResult <|
                 reportResult
-                    -- TODO: Endpoint setup
-                    "https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/default/rt-tester"
+                    -- TODO: More configurable
+                    "https://rtapi.nathanfairhurst.com/api/rt-tester"
                     token
                     { averageSeconds = average history
                     , successCount = successCount
@@ -174,10 +184,14 @@ update msg { history, state, remainingCount, loginState } =
                     }
             )
 
+        ( ReceiveSubmitResult Nothing, _ ) ->
+            ( { s | submitState = Submitted }, Cmd.none )
+
+        ( ReceiveSubmitResult (Just e), _ ) ->
+            ( { s | submitState = SubmitError e }, Cmd.none )
+
         _ ->
-            ( { history = history, state = state, remainingCount = remainingCount, loginState = loginState }
-            , Cmd.none
-            )
+            ( s, Cmd.none )
 
 
 spacer : Html Msg
@@ -230,7 +244,7 @@ addSpacer x =
 
 
 view : Model -> Html AppMsg
-view { history, state, remainingCount, loginState } =
+view { history, state, remainingCount, loginState, submitState } =
     case loginState of
         LoggingIn m ->
             Html.map LoginMsg (Login.view m)
@@ -288,10 +302,33 @@ view { history, state, remainingCount, loginState } =
                         ]
                     , case loginState of
                         LoggedIn _ ->
-                            button [ onClick Submit, disabled (remainingCount /= 0) ] [ text "Submit" ]
+                            button
+                                [ onClick Submit
+                                , disabled (remainingCount /= 0 || submitState == Submitting || submitState == Submitted || submitState == SubmitError Misconfiguration)
+                                ]
+                                [ text <|
+                                    if submitState == Submitted then
+                                        "Done!"
+
+                                    else
+                                        "Submit"
+                                ]
 
                         _ ->
                             button [ onClick StartLogin ] [ text "Login" ]
+                    , text <|
+                        case submitState of
+                            SubmitError MaybeRetry ->
+                                "A network error occurred; retries may or may not help."
+
+                            SubmitError RetryLater ->
+                                "Please retry later."
+
+                            SubmitError Misconfiguration ->
+                                "An unexpected error occured; retries will not help."
+
+                            _ ->
+                                ""
                     ]
                 ]
 
