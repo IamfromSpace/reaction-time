@@ -1,41 +1,36 @@
 module Main exposing (main)
 
 import Browser exposing (element)
-import Browser.Events exposing (onAnimationFrameDelta, onKeyDown)
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (disabled, style)
-import Html.Events exposing (onClick, preventDefaultOn)
+import Html.Events exposing (onClick)
 import Json.Decode exposing (field, string, succeed)
 import Login
+import MultiTest
 import Platform.Cmd exposing (Cmd)
-import Platform.Sub exposing (Sub, batch)
-import Random exposing (generate, int)
+import Platform.Sub exposing (Sub)
 import RtServerClient exposing (RtError(..), reportResult)
 import Task exposing (perform)
 import Time exposing (Posix, now)
 
 
-
--- TODO: Fully break AppMsg and Msg into submodules
-
-
 initialModel : Model
 initialModel =
-    { history = []
-    , state = Done 0 0 0
-    , remainingCount = 80
+    { testState = NotStarted
     , loginState = NotLoggedIn
-    , submitState = NotSubmitted
     }
 
 
 type alias Model =
-    { history : List (Maybe Float)
-    , state : State
-    , remainingCount : Int
+    { testState : TestState
     , loginState : LoginState
-    , submitState : SubmitState
     }
+
+
+type TestState
+    = NotStarted
+    | Running MultiTest.Model
+    | Done (List (Maybe Float)) SubmitState
 
 
 type SubmitState
@@ -51,22 +46,9 @@ type LoginState
     | LoggedIn String
 
 
-type State
-    = Countdown Float
-    | AwaitFinger
-    | Ready Float Int
-    | Done Float Int Int
-
-
 type Msg
-    = Tap Int
-    | RandomFinger Int
-    | Start
-    | Tick Float
-
-
-type AppMsg
-    = TestMsg Msg
+    = TestMsg MultiTest.Msg
+    | StartTest
     | LoginMsg Login.Msg
     | StartLogin
     | Submit
@@ -74,55 +56,13 @@ type AppMsg
     | ReceiveSubmitResult (Maybe RtError)
 
 
-type alias UpdateResult =
-    { next : State
-    , notifications : Maybe (Maybe Float)
-    , cmds : Cmd Msg
-    }
-
-
-updateState : Msg -> State -> UpdateResult
-updateState msg state =
-    case ( msg, state ) of
-        ( Start, Done _ _ _ ) ->
-            { next = Countdown 1000, notifications = Nothing, cmds = Cmd.none }
-
-        ( Tap answer, Ready t correct ) ->
-            { next = Done t correct answer
-            , notifications =
-                Just <|
-                    if answer == correct then
-                        Just t
-
-                    else
-                        Nothing
-            , cmds = Cmd.none
-            }
-
-        ( RandomFinger i, AwaitFinger ) ->
-            { next = Ready 0 i, notifications = Nothing, cmds = Cmd.none }
-
-        ( Tick dt, Countdown t ) ->
-            if t - dt <= 0 then
-                { next = AwaitFinger, notifications = Nothing, cmds = generate RandomFinger (int 0 3) }
-
-            else
-                { next = Countdown (t - dt), notifications = Nothing, cmds = Cmd.none }
-
-        ( Tick dt, Ready t f ) ->
-            { next = Ready (t + dt) f, notifications = Nothing, cmds = Cmd.none }
-
-        ( _, s ) ->
-            { next = s, notifications = Nothing, cmds = Cmd.none }
-
-
-update : AppMsg -> Model -> ( Model, Cmd AppMsg )
-update msg ({ history, state, remainingCount, loginState, submitState } as s) =
-    case ( msg, loginState ) of
-        ( StartLogin, NotLoggedIn ) ->
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg ({ testState, loginState } as s) =
+    case ( msg, loginState, testState ) of
+        ( StartLogin, NotLoggedIn, _ ) ->
             ( { s | loginState = LoggingIn Login.initModel }, Cmd.none )
 
-        ( LoginMsg m, LoggingIn x ) ->
+        ( LoginMsg m, LoggingIn x, _ ) ->
             let
                 ( ( next, cmds ), maybeNotifications ) =
                     Login.update "1hc2128v5ffkeokim4uvbpjmj7" m x
@@ -134,44 +74,30 @@ update msg ({ history, state, remainingCount, loginState, submitState } as s) =
                 Just token ->
                     ( { s | loginState = LoggedIn token }, Cmd.none )
 
-        ( TestMsg testMsg, _ ) ->
+        ( StartTest, _, NotStarted ) ->
+            ( { s | testState = Running MultiTest.initModel }, Cmd.none )
+
+        ( TestMsg testMsg, _, Running ts ) ->
             let
                 { next, notifications, cmds } =
-                    updateState testMsg state
+                    MultiTest.update 80 testMsg ts
             in
             case notifications of
-                Just m ->
-                    ( { s
-                        | history = m :: history
-                        , state =
-                            if remainingCount <= 1 then
-                                next
-
-                            else
-                                Countdown 1000
-                        , remainingCount = remainingCount - 1
-                      }
-                    , Cmd.map TestMsg cmds
-                    )
+                Just history ->
+                    ( { s | testState = Done history NotSubmitted }, Cmd.none )
 
                 Nothing ->
-                    ( { s | state = next }, Cmd.map TestMsg cmds )
+                    ( { s | testState = Running next }, Cmd.map TestMsg cmds )
 
-        ( Submit, _ ) ->
-            ( s
-            , if remainingCount == 0 then
-                perform SubmitReady now
+        ( Submit, _, Done _ _ ) ->
+            ( s, perform SubmitReady now )
 
-              else
-                Cmd.none
-            )
-
-        ( SubmitReady posix, LoggedIn token ) ->
+        ( SubmitReady posix, LoggedIn token, Done history submitState ) ->
             let
                 ( errorCount, successCount ) =
                     counts history
             in
-            ( { s | submitState = Submitting }
+            ( { s | testState = Done history Submitting }
             , Cmd.map ReceiveSubmitResult <|
                 reportResult
                     -- TODO: More configurable
@@ -184,37 +110,14 @@ update msg ({ history, state, remainingCount, loginState, submitState } as s) =
                     }
             )
 
-        ( ReceiveSubmitResult Nothing, _ ) ->
-            ( { s | submitState = Submitted }, Cmd.none )
+        ( ReceiveSubmitResult Nothing, _, Done history submitState ) ->
+            ( { s | testState = Done history Submitted }, Cmd.none )
 
-        ( ReceiveSubmitResult (Just e), _ ) ->
-            ( { s | submitState = SubmitError e }, Cmd.none )
+        ( ReceiveSubmitResult (Just e), _, Done history submitState ) ->
+            ( { s | testState = Done history <| SubmitError e }, Cmd.none )
 
         _ ->
             ( s, Cmd.none )
-
-
-spacer : Html Msg
-spacer =
-    div
-        [ style "height" "17.5vw"
-        , style "width" "10vw"
-        , preventDefaultOn "touchstart" (succeed ( Start, True ))
-        ]
-        []
-
-
-box : Msg -> String -> Html Msg
-box event color =
-    div
-        [ style "height" "17.5vw"
-        , style "width" "17.5vw"
-        , style "text-align" "center"
-        , style "background-color" color
-        , style "border" "1px solid black"
-        , preventDefaultOn "touchstart" (succeed ( event, True ))
-        ]
-        []
 
 
 average : List (Maybe Float) -> Float
@@ -233,78 +136,30 @@ counts =
     List.partition ((==) Nothing) >> (\( a, b ) -> ( List.length a, List.length b ))
 
 
-addSpacer : List (Html Msg) -> List (Html Msg)
-addSpacer x =
-    case x of
-        a :: b :: t ->
-            a :: b :: spacer :: t
+view : Model -> Html Msg
+view { testState, loginState } =
+    div [ style "display" "flex", style "justify-content" "center", style "align-items" "center", style "height" "90vh" ]
+        [ div
+            []
+          <|
+            [ div [ style "margin" "14px", style "font-size" "28px", style "display" "flex", style "justify-content" "center" ] [ text "Reaction Time Tester" ] ]
+                ++ (case ( loginState, testState ) of
+                        ( LoggingIn m, _ ) ->
+                            [ Html.map LoginMsg (Login.view m) ]
 
-        y ->
-            y
+                        ( _, NotStarted ) ->
+                            [ button [ onClick StartTest ] [ text "Start" ]
+                            , button [ onClick StartLogin ] [ text "Login" ]
+                            ]
 
+                        ( _, Running ts ) ->
+                            [ Html.map TestMsg <| MultiTest.view ts ]
 
-view : Model -> Html AppMsg
-view { history, state, remainingCount, loginState, submitState } =
-    case loginState of
-        LoggingIn m ->
-            Html.map LoginMsg (Login.view m)
-
-        _ ->
-            let
-                colors =
-                    case state of
-                        Done _ i o ->
-                            List.map
-                                (\x ->
-                                    if i == o then
-                                        "green"
-
-                                    else
-                                        "red"
-                                )
-                                [ 0, 1, 2, 3 ]
-
-                        Ready _ i ->
-                            List.map
-                                (\x ->
-                                    if x == i then
-                                        "green"
-
-                                    else
-                                        "white"
-                                )
-                                [ 0, 1, 2, 3 ]
-
-                        _ ->
-                            [ "white", "white", "white", "white" ]
-            in
-            div [ style "display" "flex", style "justify-content" "center", style "align-items" "center", style "height" "90vh" ]
-                [ div
-                    []
-                    [ div [ style "margin" "14px", style "font-size" "28px", style "display" "flex", style "justify-content" "center" ] [ text "Reaction Time Tester" ]
-                    , Html.map TestMsg <|
-                        div [ style "flex-direction" "row", style "display" "flex" ]
-                            (addSpacer (List.indexedMap (Tap >> box) colors))
-                    , div
-                        [ style "display" "flex"
-                        , style "justify-content" "space-between"
-                        , style "flex-direction" "row"
-                        , style "color"
-                            (if remainingCount == 0 then
-                                "black"
-
-                             else
-                                "#00000000"
-                            )
-                        ]
-                        [ div [] [ text <| (pastDecimal 1 (String.fromFloat (average history)) ++ "ms") ]
-                        , div [] [ text <| (\( e, c ) -> String.fromInt c ++ "/" ++ String.fromInt (c + e)) <| counts history ]
-                        ]
-                    , case loginState of
-                        LoggedIn _ ->
-                            button
+                        ( LoggedIn _, Done history submitState ) ->
+                            [ viewResult history
+                            , button
                                 [ onClick Submit
-                                , disabled (remainingCount /= 0 || submitState == Submitting || submitState == Submitted || submitState == SubmitError Misconfiguration)
+                                , disabled (submitState == Submitting || submitState == Submitted || submitState == SubmitError Misconfiguration)
                                 ]
                                 [ text <|
                                     if submitState == Submitted then
@@ -313,24 +168,39 @@ view { history, state, remainingCount, loginState, submitState } =
                                     else
                                         "Submit"
                                 ]
+                            , text <|
+                                case submitState of
+                                    SubmitError MaybeRetry ->
+                                        "A network error occurred; retries may or may not help."
 
-                        _ ->
-                            button [ onClick StartLogin ] [ text "Login" ]
-                    , text <|
-                        case submitState of
-                            SubmitError MaybeRetry ->
-                                "A network error occurred; retries may or may not help."
+                                    SubmitError RetryLater ->
+                                        "Please retry later."
 
-                            SubmitError RetryLater ->
-                                "Please retry later."
+                                    SubmitError Misconfiguration ->
+                                        "An unexpected error occured; retries will not help."
 
-                            SubmitError Misconfiguration ->
-                                "An unexpected error occured; retries will not help."
+                                    _ ->
+                                        ""
+                            ]
 
-                            _ ->
-                                ""
-                    ]
-                ]
+                        ( _, Done history submitState ) ->
+                            [ viewResult history
+                            , button [ onClick StartLogin ] [ text "Login to Submit" ]
+                            ]
+                   )
+        ]
+
+
+viewResult : List (Maybe Float) -> Html a
+viewResult history =
+    div
+        [ style "display" "flex"
+        , style "justify-content" "space-between"
+        , style "flex-direction" "row"
+        ]
+        [ div [] [ text <| (pastDecimal 1 (String.fromFloat (average history)) ++ "ms") ]
+        , div [] [ text <| (\( e, c ) -> String.fromInt c ++ "/" ++ String.fromInt (c + e)) <| counts history ]
+        ]
 
 
 
@@ -357,60 +227,20 @@ pastDecimal n s =
 
 
 sub : Model -> Sub Msg
-sub { state } =
-    case state of
-        Countdown _ ->
-            onAnimationFrameDelta Tick
-
-        Ready _ _ ->
-            batch
-                [ onAnimationFrameDelta Tick
-                , onKeyDown
-                    (Json.Decode.map
-                        (\c ->
-                            Tap <|
-                                case c of
-                                    "e" ->
-                                        0
-
-                                    "u" ->
-                                        1
-
-                                    "h" ->
-                                        2
-
-                                    "t" ->
-                                        3
-
-                                    _ ->
-                                        -1
-                        )
-                        (field "key" string)
-                    )
-                ]
-
-        Done _ _ _ ->
-            onKeyDown
-                (Json.Decode.map
-                    (\x ->
-                        if x == " " then
-                            Start
-
-                        else
-                            RandomFinger -1
-                    )
-                    (field "key" string)
-                )
+sub { testState } =
+    case testState of
+        Running ts ->
+            Sub.map TestMsg <| MultiTest.sub ts
 
         _ ->
             Sub.none
 
 
-main : Program () Model AppMsg
+main : Program () Model Msg
 main =
     element
         { init = \_ -> ( initialModel, Cmd.none )
         , view = view
         , update = update
-        , subscriptions = Sub.map TestMsg << sub
+        , subscriptions = sub
         }
