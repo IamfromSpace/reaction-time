@@ -10,8 +10,7 @@ import MultiTest
 import Platform.Cmd exposing (Cmd)
 import Platform.Sub exposing (Sub)
 import RtServerClient exposing (RtError(..), reportResult)
-import Task exposing (perform)
-import Time exposing (Posix, now)
+import Time exposing (Posix)
 
 
 initialModel : Model
@@ -30,7 +29,8 @@ type alias Model =
 type TestState
     = NotStarted
     | Running MultiTest.Model
-    | Done (List (Maybe Float)) SubmitState
+      -- TODO: This data may make sense as a sub Model
+    | Done Posix (List (Maybe Float)) SubmitState
 
 
 type SubmitState
@@ -52,7 +52,6 @@ type Msg
     | LoginMsg Login.Msg
     | StartLogin
     | Submit
-    | SubmitReady Posix
     | ReceiveSubmitResult (Maybe RtError)
 
 
@@ -83,21 +82,18 @@ update msg ({ testState, loginState } as s) =
                     MultiTest.update 80 testMsg ts
             in
             case notifications of
-                Just history ->
-                    ( { s | testState = Done history NotSubmitted }, Cmd.none )
+                Just ( posix, history ) ->
+                    ( { s | testState = Done posix history NotSubmitted }, Cmd.none )
 
                 Nothing ->
                     ( { s | testState = Running next }, Cmd.map TestMsg cmds )
 
-        ( Submit, _, Done _ _ ) ->
-            ( s, perform SubmitReady now )
-
-        ( SubmitReady posix, LoggedIn token, Done history submitState ) ->
+        ( Submit, LoggedIn token, Done posix history submitState ) ->
             let
                 ( errorCount, successCount ) =
                     counts history
             in
-            ( { s | testState = Done history Submitting }
+            ( { s | testState = Done posix history Submitting }
             , Cmd.map ReceiveSubmitResult <|
                 reportResult
                     -- TODO: More configurable
@@ -110,11 +106,11 @@ update msg ({ testState, loginState } as s) =
                     }
             )
 
-        ( ReceiveSubmitResult Nothing, _, Done history submitState ) ->
-            ( { s | testState = Done history Submitted }, Cmd.none )
+        ( ReceiveSubmitResult Nothing, _, Done posix history submitState ) ->
+            ( { s | testState = Done posix history Submitted }, Cmd.none )
 
-        ( ReceiveSubmitResult (Just e), _, Done history submitState ) ->
-            ( { s | testState = Done history <| SubmitError e }, Cmd.none )
+        ( ReceiveSubmitResult (Just e), _, Done posix history submitState ) ->
+            ( { s | testState = Done posix history <| SubmitError e }, Cmd.none )
 
         _ ->
             ( s, Cmd.none )
@@ -155,7 +151,7 @@ view { testState, loginState } =
                         ( _, Running ts ) ->
                             [ Html.map TestMsg <| MultiTest.view ts ]
 
-                        ( LoggedIn _, Done history submitState ) ->
+                        ( LoggedIn _, Done _ history submitState ) ->
                             [ viewResult history
                             , button
                                 [ onClick Submit
@@ -183,7 +179,7 @@ view { testState, loginState } =
                                         ""
                             ]
 
-                        ( _, Done history submitState ) ->
+                        ( _, Done _ history submitState ) ->
                             [ viewResult history
                             , button [ onClick StartLogin ] [ text "Login to Submit" ]
                             ]

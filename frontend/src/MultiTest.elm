@@ -4,6 +4,8 @@ import Html exposing (Html)
 import Platform.Cmd exposing (Cmd)
 import Platform.Sub exposing (Sub)
 import SingleTest
+import Task exposing (perform)
+import Time exposing (Posix, now)
 
 
 initModel : Model
@@ -19,23 +21,27 @@ type alias Model =
 
 type Msg
     = SingleTestMsg SingleTest.Msg
+    | Now Posix
 
 
 type alias UpdateResult =
     { next : Model
-    , notifications : Maybe (List (Maybe Float))
+    , notifications : Maybe ( Posix, List (Maybe Float) )
     , cmds : Cmd Msg
     }
 
 
 update : Int -> Msg -> Model -> UpdateResult
 update targetCount msg ({ history, testState } as model) =
-    if List.length history == targetCount then
-        { next = model, notifications = Nothing, cmds = Cmd.none }
+    case msg of
+        Now posix ->
+            { next = model, notifications = Just ( posix, history ), cmds = Cmd.none }
 
-    else
-        case msg of
-            SingleTestMsg m ->
+        SingleTestMsg m ->
+            if List.length history == targetCount then
+                { next = model, notifications = Nothing, cmds = Cmd.none }
+
+            else
                 let
                     ur =
                         SingleTest.update m testState
@@ -51,15 +57,18 @@ update targetCount msg ({ history, testState } as model) =
                         let
                             history_ =
                                 testResult :: history
+
+                            urCmds =
+                                Cmd.map SingleTestMsg ur.cmds
                         in
                         { next = { model | testState = SingleTest.initModel, history = history_ }
-                        , notifications =
+                        , notifications = Nothing
+                        , cmds =
                             if List.length history_ == targetCount then
-                                Just history_
+                                Cmd.batch [ perform Now now, urCmds ]
 
                             else
-                                Nothing
-                        , cmds = Cmd.map SingleTestMsg ur.cmds
+                                urCmds
                         }
 
 
