@@ -5,11 +5,14 @@
 module Lib
     (handler) where
 
-import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyRequest (..))
+import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyRequest (..),
+                                                            cognitoIdentityId,
+                                                            identity)
 import           AWS.Lambda.Events.ApiGatewayProxyResponse (ApiGatewayProxyResponse (..))
 import           Control.Lens                              (set)
 import           Data.HashMap.Strict                       (HashMap, fromList)
 import           Data.Text                                 (Text, pack)
+import           Data.Text.Lazy                            (toStrict)
 import           Data.Time.Clock                           (UTCTime)
 import           Network.AWS                               (MonadAWS, send)
 import           Network.AWS.DynamoDB.PutItem              (PutItem, piItem,
@@ -48,26 +51,29 @@ data Tbd = Tbd
 
 instance FromJSON Tbd
 
-putRtResult :: Text -> RtResult -> PutItem
-putRtResult tableName rtResult =
-  set piItem (toRtResultItem rtResult) (putItem tableName)
+putRtResult :: Text -> Text -> RtResult -> PutItem
+putRtResult tableName cognitoIdentityId rtResult =
+  set piItem (toRtResultItem cognitoIdentityId rtResult) (putItem tableName)
 
-toRtResultItem :: RtResult -> HashMap Text AttributeValue
-toRtResultItem RtResult { averageSeconds, successCount, testCount, dateTime } =
+toRtResultItem :: Text -> RtResult -> HashMap Text AttributeValue
+toRtResultItem cognitoIentityId RtResult { averageSeconds, successCount, testCount, dateTime } =
     fromList
       [ ("averageReactionTimeSeconds", set avN (Just $ pack $ show averageSeconds) attributeValue)
       , ("successCount", set avN (Just $ pack $ show successCount) attributeValue)
       , ("testCount", set avN (Just $ pack $ show testCount) attributeValue)
       , ("dateTimeUTC", set avS (Just $ pack $ show dateTime) attributeValue)
+      , ("cognitoIdentityId", set avS (Just cognitoIentityId) attributeValue)
       ]
 
 handler :: MonadAWS m => Text -> ApiGatewayProxyRequest -> m ApiGatewayProxyResponse
-handler tableName ApiGatewayProxyRequest { body, httpMethod = "POST"} =
-  case decode body of
-    Just rtResult ->  do
-      _ <- send (putRtResult tableName rtResult)
+handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST"} =
+  case (decode body, cognitoIdentityId (identity requestContext)) of
+    (Just rtResult, Just cogId) -> do
+      _ <- send $ putRtResult tableName (toStrict cogId) rtResult
       return (ApiGatewayProxyResponse 200 mempty "Done")
-    Nothing ->
+    (Just _, Nothing) ->
+      return (ApiGatewayProxyResponse 401 mempty "Unauthorized")
+    (Nothing, _) ->
       return (ApiGatewayProxyResponse 400 mempty "Bad Request")
 handler _ ApiGatewayProxyRequest { body, httpMethod = "PUT" } =
   case decode body of
