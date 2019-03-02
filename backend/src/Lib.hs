@@ -61,21 +61,21 @@ toRtResultItem RtResult { averageSeconds, successCount, testCount, dateTime } =
       , ("dateTimeUTC",  set avS (Just $ pack $ show dateTime) attributeValue)
       ]
 
-handler :: MonadAWS m => ApiGatewayProxyRequest -> m ApiGatewayProxyResponse
-handler ApiGatewayProxyRequest { body, httpMethod = "POST"} =
+handler :: MonadAWS m => Text -> ApiGatewayProxyRequest -> m ApiGatewayProxyResponse
+handler tableName ApiGatewayProxyRequest { body, httpMethod = "POST"} =
   case decode body of
     Just rtResult ->  do
-      _ <- send (putRtResult "rt-tester" rtResult)
+      _ <- send (putRtResult tableName rtResult)
       return (ApiGatewayProxyResponse 200 mempty "Done")
     Nothing ->
       return (ApiGatewayProxyResponse 400 mempty "BadRequest")
-handler ApiGatewayProxyRequest { body, httpMethod = "PUT" } =
+handler _ ApiGatewayProxyRequest { body, httpMethod = "PUT" } =
   case decode body of
     Just Tbd { tbd1 } ->
       return (ApiGatewayProxyResponse 500 mempty tbd1)
     Nothing ->
       return (ApiGatewayProxyResponse 400 mempty "BadRequest")
-handler ApiGatewayProxyRequest { httpMethod = "GET" } =
+handler _ ApiGatewayProxyRequest { httpMethod = "GET" } =
   return (ApiGatewayProxyResponse 500 mempty "Not Yet Implemented")
-handler _ =
+handler _ _ =
   return (ApiGatewayProxyResponse 405 mempty "Method Not Supported")

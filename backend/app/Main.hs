@@ -3,10 +3,12 @@ module Main where
 import           AWS.Lambda.Context (HasLambdaContext (..))
 import           AWS.Lambda.Runtime (mRuntimeWithContext)
 import           Control.Lens       (set)
+import           Data.Text          (pack)
 import           Lib                (handler)
 import           Network.AWS        (Credentials (Discover), Env,
                                      LogLevel (Debug), envLogger, newEnv,
                                      newLogger, runAWS, runResourceT)
+import           System.Environment (getEnv)
 import           System.IO          (stderr)
 
 -- TODO: This is an awkward interaction that needs some thought.
@@ -17,8 +19,9 @@ instance HasLambdaContext Env where
 
 main :: IO ()
 main = do
+  tableName <- pack <$> getEnv "TABLE_NAME"
   lgr <- newLogger Debug stderr
   env <- newEnv Discover
   runResourceT $
       runAWS (set envLogger lgr env) $
-      mRuntimeWithContext handler
+      mRuntimeWithContext $ handler tableName
