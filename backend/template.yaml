@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: Lambda for recording reaction time test results.
+Parameters:
+  TableStack:
+    Type: String
+    Description: The name of the stack that exports the table that will be used
+  UserPoolStack:
+    Type: String
+    Description: The name of the stack that exports the user pool that will be used
+  LambdaCodeStack:
+    Type: String
+    Description: The name of the stack that exports the bucket where the lambda code is stored
+  CertStack:
+    Type: String
+    Description: The name of the stack that exports the certificate for the domain name
+  CodeVersion:
+    Type: String
+    Description: The version string from the bucket of the code that will be used
+Resources:
+  ReactionTime:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: NOT_USED
+      Runtime: provided
+      Description: Lambda for recording reaction time test results.
+      CodeUri:
+        Bucket:
+          Fn::ImportValue: !Ref LambdaCodeStack
+        Key: !Sub '${AWS::StackName}.zip'
+        Version: !Ref CodeVersion
+      Events:
+        ApiInteraction:
+          Type: Api
+          Properties:
+            Path: /api/{proxy+}
+            Method: post
+            RestApiId: !Ref Api
+            Auth:
+              Authorizers:
+                Cognito:
+                  UserPoolArn:
+                    Fn::GetAtt:
+                      Fn:ImportValue: !Sub "${UserPoolStack}-UserPool"
+      Environment:
+        Variables:
+          TABLE_NAME:
+            Fn::ImportValue: !Sub "${TableStack}-Table"
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - 'dynamodb:PutItem'
+                - 'dynamodb:BatchWriteItem'
+                - 'dynamodb:GetItem'
+                - 'dynamodb:BatchGetItem'
+                - 'dynamodb:Query'
+                - 'dynamodb:Scan'
+                - 'dynamodb:UpdateItem'
+                - 'dynamodb:DeleteItem'
+              Resource:
+                Fn::ImportValue: !Sub "${TableStack}-TableArn"
+      MemorySize: 128
+      Timeout: 3
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: default
+      EndpointConfiguration: "REGIONAL"
+  CustomDomain:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName:
+        Fn::ImportValue: !Sub "${CertStack}-DomainName"
+      RegionalCertificateArn:
+        Fn::ImportValue: !Sub "${CertStack}-Cert"
+      EndpointConfiguration:
+        Types:
+          - "REGIONAL"
+  BasePathMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      BasePath: "api"
+      DomainName: !Ref CustomDomain
+      RestApiId: !Ref Api
+      Stage: default
+    # This is a hack to make sure the stage that the Serverless transform creates
+    # (and we do not see in the template) is available by the time we add the mapping.
+    DependsOn:
+      ApidefaultStage
