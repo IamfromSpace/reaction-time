@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  Table:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: cognitoIdentityId
+          AttributeType: S
+        - AttributeName: dateTime
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: cognitoIdentityId
+          KeyType: HASH
+        - AttributeName: dateTime
+          KeyType: RANGE
+Outputs:
+  TableName:
+    Description: The name of the table
+    Value: !Ref Table
+    Export:
+      Name: !Sub "${AWS::StackName}-Table"
+  TableArn:
+    Description: The arn of the table
+    Value:
+      !GetAtt
+        - Table
+        - Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-TableArn"
