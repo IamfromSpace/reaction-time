@@ -1,0 +1,22 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  DomainName:
+    Type: String
+    Description: The Domain name for a cert--no wildcards!
+Resources:
+  Cert:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      ValidationMethod: DNS
+Outputs:
+  DomainName:
+    Description: The domain name that is certified
+    Value: !Ref DomainName
+    Export:
+      Name: !Sub "${AWS::StackName}-DomainName"
+  Cert:
+    Description: The certificate that certifies the domain name
+    Value: !Ref Cert
+    Export:
+      Name: !Sub "${AWS::StackName}-Cert"
