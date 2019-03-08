@@ -48,20 +48,7 @@ Resources:
             Fn::ImportValue: !Sub "${TableStack}-Table"
       Policies:
         - AWSLambdaBasicExecutionRole
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - 'dynamodb:PutItem'
-                - 'dynamodb:BatchWriteItem'
-                - 'dynamodb:GetItem'
-                - 'dynamodb:BatchGetItem'
-                - 'dynamodb:Query'
-                - 'dynamodb:Scan'
-                - 'dynamodb:UpdateItem'
-                - 'dynamodb:DeleteItem'
-              Resource:
-                Fn::ImportValue: !Sub "${TableStack}-TableArn"
+        - Fn::ImportValue: !Sub "${TableStack}-TableDataPlanePolicy"
       MemorySize: 128
       Timeout: 3
   Api:

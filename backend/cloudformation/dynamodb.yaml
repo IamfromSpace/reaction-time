@@ -14,6 +14,23 @@ Resources:
           KeyType: HASH
         - AttributeName: dateTime
           KeyType: RANGE
+  DataPlanePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'dynamodb:PutItem'
+              - 'dynamodb:BatchWriteItem'
+              - 'dynamodb:GetItem'
+              - 'dynamodb:BatchGetItem'
+              - 'dynamodb:Query'
+              - 'dynamodb:Scan'
+              - 'dynamodb:UpdateItem'
+              - 'dynamodb:DeleteItem'
+            Resource: !GetAtt Table.Arn
 Outputs:
   TableName:
     Description: The name of the table
@@ -22,9 +39,11 @@ Outputs:
       Name: !Sub "${AWS::StackName}-Table"
   TableArn:
     Description: The arn of the table
-    Value:
-      !GetAtt
-        - Table
-        - Arn
+    Value: !GetAtt Table.Arn
     Export:
       Name: !Sub "${AWS::StackName}-TableArn"
+  TableDataPlanePolicy:
+    Description: The arn of the managed policy that allows an application to read/write within the data plane.
+    Value: !Ref DataPlanePolicy
+    Export:
+      Name: !Sub "${AWS::StackName}-TableDataPlanePolicy"
