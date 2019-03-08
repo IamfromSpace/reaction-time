@@ -37,11 +37,7 @@ Resources:
             Method: post
             RestApiId: !Ref Api
             Auth:
-              Authorizers:
-                Cognito:
-                  UserPoolArn:
-                    Fn::GetAtt:
-                      Fn:ImportValue: !Sub "${UserPoolStack}-UserPool"
+              Authorizer: Cognito
       Environment:
         Variables:
           TABLE_NAME:
@@ -56,6 +52,15 @@ Resources:
     Properties:
       StageName: default
       EndpointConfiguration: "REGIONAL"
+      Auth:
+        Authorizers:
+          Cognito:
+            UserPoolArn:
+              Fn::ImportValue:
+                # Note: that we need the UserPoolStack to export the arn,
+                # because if we have to use a GetAtt from an subbed and imported
+                # value, it breaks the SAM transformer.
+                Fn::Sub: "${UserPoolStack}-UserPoolArn"
   CustomDomain:
     Type: AWS::ApiGateway::DomainName
     Properties:
