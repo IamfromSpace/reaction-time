@@ -82,3 +82,14 @@ Resources:
     # (and we do not see in the template) is available by the time we add the mapping.
     DependsOn:
       ApidefaultStage
+Outputs:
+  Api:
+    Description: The Rest API Id
+    Value: !Ref Api
+    Export:
+      Name: !Sub "${AWS::StackName}-Api"
+  ApiRootResourceId:
+    Description: The Rest API Id
+    Value: !GetAtt Api.RootResourceId
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiRootResourceId"
