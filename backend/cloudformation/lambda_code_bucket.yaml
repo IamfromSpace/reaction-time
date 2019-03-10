@@ -10,7 +10,7 @@ Resources:
       VersioningConfiguration:
         Status: Enabled
 Outputs:
-  DomainName:
+  Bucket:
     Description: The bucket for storing lambda code
     Value: !Ref Bucket
     Export:

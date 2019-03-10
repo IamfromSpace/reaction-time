@@ -61,6 +61,7 @@ Resources:
                 # because if we have to use a GetAtt from an subbed and imported
                 # value, it breaks the SAM transformer.
                 Fn::Sub: "${UserPoolStack}-UserPoolArn"
+  #TODO: Move this into the DomainName Stack so all the domain pieces happen in the same place.
   CustomDomain:
     Type: AWS::ApiGateway::DomainName
     Properties:
