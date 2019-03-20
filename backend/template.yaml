@@ -11,9 +11,9 @@ Parameters:
   LambdaCodeStack:
     Type: String
     Description: The name of the stack that exports the bucket where the lambda code is stored
-  CertStack:
+  DomainNameStack:
     Type: String
-    Description: The name of the stack that exports the certificate for the domain name
+    Description: The name of the stack that exports the API Gateway Custom Domain
   CodeVersion:
     Type: String
     Description: The version string from the bucket of the code that will be used
@@ -61,21 +61,11 @@ Resources:
                 # because if we have to use a GetAtt from an subbed and imported
                 # value, it breaks the SAM transformer.
                 Fn::Sub: "${UserPoolStack}-UserPoolArn"
-  #TODO: Move this into the DomainName Stack so all the domain pieces happen in the same place.
-  CustomDomain:
-    Type: AWS::ApiGateway::DomainName
-    Properties:
-      DomainName:
-        Fn::ImportValue: !Sub "${CertStack}-DomainName"
-      RegionalCertificateArn:
-        Fn::ImportValue: !Sub "${CertStack}-Cert"
-      EndpointConfiguration:
-        Types:
-          - "REGIONAL"
   BasePathMapping:
     Type: AWS::ApiGateway::BasePathMapping
     Properties:
-      DomainName: !Ref CustomDomain
+      DomainName:
+        Fn::ImportValue: !Sub "${DomainNameStack}-CustomDomain"
       RestApiId: !Ref Api
       Stage: default
     # This is a hack to make sure the stage that the Serverless transform creates
