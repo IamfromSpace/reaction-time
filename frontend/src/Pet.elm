@@ -122,7 +122,72 @@ view ( _, state ) =
             , disabled (isNothing description)
             ]
             [ text <| Maybe.withDefault "Done!" <| description ]
+        , links 50 100 [ ( "red", Record ), ( "blue", Record ), ( "blue", Record ) ]
         ]
+
+
+px : Float -> String
+px i =
+    (\x -> x ++ "px") <| String.fromFloat i
+
+
+links : Float -> Float -> List ( String, Msg ) -> Html Msg
+links diameter length colorsAndMsgs =
+    div [ style "position" "relative" ] <|
+        Tuple.first <|
+            List.foldl
+                (\( color, msg ) ( xs, i ) ->
+                    ( xs ++ linkPair (i == (List.length xs - 2)) i diameter length color msg
+                    , i + 1
+                    )
+                )
+                ( [], 0 )
+                colorsAndMsgs
+
+
+linkPair : Bool -> Int -> Float -> Float -> String -> Msg -> List (Html Msg)
+linkPair final i diameter length color msg =
+    let
+        borderWidth =
+            diameter / 15
+
+        circle =
+            div
+                [ style "background-color" color
+                , style "border-width" (px borderWidth)
+                , style "border-color" "white"
+                , style "border-style" "solid"
+                , style "border-radius" (px diameter)
+                , style "height" (px (diameter - borderWidth * 2))
+                , style "width" (px (diameter - borderWidth * 2))
+                , style "position" "absolute"
+                , style "top" (px 0)
+                , style "left" (px (toFloat i * length))
+                , onClick msg
+                ]
+                []
+
+        len =
+            div
+                [ style "background-color" color
+                , style "border-width" (px borderWidth)
+                , style "border-color" "white"
+                , style "border-style" "solid"
+                , style "border-radius" (px (diameter / 2))
+                , style "height" (px ((diameter - borderWidth * 2) / 3))
+                , style "width" (px (length + diameter / 3))
+                , style "position" "absolute"
+                , style "top" (px ((diameter - borderWidth * 2) / 3))
+                , style "left" (px (toFloat i * length + (diameter - borderWidth * 2) / 3))
+                , onClick msg
+                ]
+                []
+    in
+    if final then
+        [ circle ]
+
+    else
+        [ circle, len ]
 
 
 main : Program () Model Msg
