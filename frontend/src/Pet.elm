@@ -12,125 +12,116 @@ import Time exposing (Posix, now, posixToMillis)
 
 initialModel : Model
 initialModel =
-    { recordings = Dict.empty
-    , startTime = Nothing
-    }
+    ( False, NotStarted )
+
+
+type RecordState
+    = NotStarted
+    | Started Posix
+    | SomewhatHard Posix
+    | SomewhatHard2 Posix Float
+    | Hard Posix Float Float
+    | Hard2 Posix Float Float Float
+    | Done Float Float Float Float
+
+
+
+-- Model also holds if we are currently capturing the Posix Time
 
 
 type alias Model =
-    { recordings : Dict Int Float
-    , startTime : Maybe Posix
-    }
+    ( Bool, RecordState )
 
 
 type Msg
-    = Start
-    | Started Posix
-    | Record Int
-    | Recorded Int Posix
+    = Record
+    | Recorded Posix
+
+
+toSiDuration : Posix -> Posix -> Float
+toSiDuration t1 t0 =
+    toFloat (posixToMillis t1 - posixToMillis t0) / 1000
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg ({ startTime, recordings } as s) =
-    case ( msg, startTime ) of
-        ( Start, Nothing ) ->
-            ( s, Task.perform Started now )
+update msg s =
+    case ( msg, s ) of
+        ( Record, ( False, _ ) ) ->
+            ( ( True, Tuple.second s ), Task.perform Recorded now )
 
-        ( Started t, Nothing ) ->
-            ( { s | startTime = Just t }, Cmd.none )
+        ( Recorded t, ( True, NotStarted ) ) ->
+            ( ( False, Started t ), Cmd.none )
 
-        ( Record x, Just _ ) ->
-            ( s, Task.perform (Recorded x) now )
+        ( Recorded _, ( True, Started t0 ) ) ->
+            ( ( False, SomewhatHard t0 ), Cmd.none )
 
-        ( Recorded x t, Just st ) ->
-            let
-                seconds =
-                    toFloat (posixToMillis t - posixToMillis st) / 1000
-            in
-            ( { s | recordings = Dict.insert x seconds recordings }, Cmd.none )
+        ( Recorded t, ( True, SomewhatHard t0 ) ) ->
+            ( ( False, SomewhatHard2 t0 (toSiDuration t t0) ), Cmd.none )
+
+        ( Recorded t, ( True, SomewhatHard2 t0 t1 ) ) ->
+            ( ( False, Hard t0 t1 (toSiDuration t t0) ), Cmd.none )
+
+        ( Recorded t, ( True, Hard t0 t1 t2 ) ) ->
+            ( ( False, Hard2 t0 t1 t2 (toSiDuration t t0) ), Cmd.none )
+
+        ( Recorded t, ( True, Hard2 t0 t1 t2 t3 ) ) ->
+            ( ( False, Done t1 t2 t3 (toSiDuration t t0) ), Cmd.none )
 
         _ ->
             ( s, Cmd.none )
 
 
-describeRpe : Int -> Maybe String
-describeRpe i =
-    case i of
-        6 ->
-            Just "No exertion at all"
 
-        7 ->
-            Just "Extremely light"
+-- A Nothing means there is no next state.
 
-        8 ->
-            Just "Between Extremely and Very Light"
 
-        9 ->
-            Just "Very Light"
+describeNext : RecordState -> Maybe String
+describeNext next =
+    case next of
+        NotStarted ->
+            Just "Start"
 
-        10 ->
-            Just "Between Very Light and Light"
-
-        11 ->
-            Just "Light"
-
-        12 ->
-            Just "Between Light and Somewhat Hard"
-
-        13 ->
+        Started _ ->
             Just "Somewhat Hard"
 
-        14 ->
+        SomewhatHard _ ->
             Just "Between Somewhat Hard and Hard"
 
-        15 ->
+        SomewhatHard2 _ _ ->
             Just "Hard"
 
-        16 ->
+        Hard _ _ _ ->
             Just "Between Hard and Very Hard"
 
-        17 ->
+        Hard2 _ _ _ _ ->
             Just "Very Hard"
 
-        18 ->
-            Just "Between Very Hard and Extremely Hard"
-
-        19 ->
-            Just "Extremely Hard"
-
-        20 ->
-            Just "Maximal exertion"
-
-        _ ->
+        Done _ _ _ _ ->
             Nothing
 
 
-last : List a -> Maybe a
-last list =
-    case list of
-        [] ->
-            Nothing
+isNothing : Maybe a -> Bool
+isNothing m =
+    case m of
+        Just _ ->
+            False
 
-        [ x ] ->
-            Just x
-
-        h :: t ->
-            last t
+        Nothing ->
+            True
 
 
 view : Model -> Html Msg
-view { startTime, recordings } =
+view ( _, state ) =
     let
-        nextRpe =
-            Maybe.withDefault 12 (last (Dict.keys recordings)) + 1
+        description =
+            describeNext state
     in
     div []
-        [ case startTime of
-            Just _ ->
-                button [ onClick (Record nextRpe) ] [ text <| Maybe.withDefault "TODO!" <| describeRpe nextRpe ]
-
-            Nothing ->
-                button [ onClick Start ] [ text "Start" ]
+        [ button
+            [ onClick Record
+            , disabled (isNothing description)
+            ]
+            [ text <| Maybe.withDefault "Done!" <| description ]
         ]
 
 
