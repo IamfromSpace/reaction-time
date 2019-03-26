@@ -137,7 +137,7 @@ links diameter length colorsAndMsgs =
         Tuple.first <|
             List.foldl
                 (\( color, msg ) ( xs, i ) ->
-                    ( xs ++ linkPair (i == (List.length xs - 2)) i diameter length color msg
+                    ( xs ++ linkPair (i == 0) i diameter length color msg
                     , i + 1
                     )
                 )
@@ -178,7 +178,7 @@ linkPair final i diameter length color msg =
                 , style "width" (px (length + diameter / 3))
                 , style "position" "absolute"
                 , style "top" (px ((diameter - borderWidth * 2) / 3))
-                , style "left" (px (toFloat i * length + (diameter - borderWidth * 2) / 3))
+                , style "left" (px (toFloat (i - 1) * length + (diameter - borderWidth * 2) / 3))
                 , onClick msg
                 ]
                 []
@@ -187,7 +187,7 @@ linkPair final i diameter length color msg =
         [ circle ]
 
     else
-        [ circle, len ]
+        [ len, circle ]
 
 
 main : Program () Model Msg
