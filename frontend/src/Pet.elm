@@ -125,12 +125,12 @@ view ( _, state ) =
         , links
             60
             125
-            [ LinkConfig "Start" "#23ba2d" Record
-            , LinkConfig "Somewhat Hard" "#23ba2d" Record
-            , LinkConfig "" "#23ba2d" Record
-            , LinkConfig "Hard" "#baad23" Record
-            , LinkConfig "" "grey" Record
-            , LinkConfig "Very Hard" "grey" Record
+            [ LinkConfig "Start" "#23ba2d" Nothing
+            , LinkConfig "Somewhat Hard" "#23ba2d" Nothing
+            , LinkConfig "" "#23ba2d" Nothing
+            , LinkConfig "Hard" "#baad23" (Just Record)
+            , LinkConfig "" "grey" Nothing
+            , LinkConfig "Very Hard" "grey" Nothing
             ]
         ]
 
@@ -143,7 +143,7 @@ px i =
 type alias LinkConfig m =
     { label : String
     , color : String
-    , msg : m
+    , maybeMsg : Maybe m
     }
 
 
@@ -152,8 +152,8 @@ links diameter length colorsAndMsgs =
     div [ style "position" "relative" ] <|
         Tuple.first <|
             List.foldl
-                (\{ color, msg, label } ( xs, i ) ->
-                    ( xs ++ linkPair (i == 0) i diameter length label color msg
+                (\{ color, maybeMsg, label } ( xs, i ) ->
+                    ( xs ++ linkPair (i == 0) i diameter length label color maybeMsg
                     , i + 1
                     )
                 )
@@ -161,28 +161,24 @@ links diameter length colorsAndMsgs =
                 colorsAndMsgs
 
 
-linkPair : Bool -> Int -> Float -> Float -> String -> String -> Msg -> List (Html Msg)
-linkPair final i diameter length labelText color msg =
+linkPair : Bool -> Int -> Float -> Float -> String -> String -> Maybe Msg -> List (Html Msg)
+linkPair final i diameter length labelText color mMsg =
     let
         borderWidth =
             diameter / 15
 
-        circle =
-            div
-                [ style "background-color" color
-                , style "border-width" (px borderWidth)
-                , style "border-color" "white"
-                , style "border-style" "solid"
-                , style "border-radius" (px diameter)
-                , style "box-shadow" "5px 5px 10px lightgrey"
-                , style "height" (px (diameter - borderWidth * 2))
-                , style "width" (px (diameter - borderWidth * 2))
-                , style "position" "absolute"
-                , style "top" (px 0)
-                , style "left" (px (toFloat i * length))
-                , onClick msg
-                ]
-                []
+        circleStyle =
+            [ style "background-color" color
+            , style "border-width" (px borderWidth)
+            , style "border-color" "white"
+            , style "border-style" "solid"
+            , style "border-radius" (px diameter)
+            , style "height" (px (diameter - borderWidth * 2))
+            , style "width" (px (diameter - borderWidth * 2))
+            , style "position" "absolute"
+            , style "top" (px 0)
+            , style "left" (px (toFloat i * length))
+            ]
 
         label =
             div
@@ -195,21 +191,26 @@ linkPair final i diameter length labelText color msg =
                 ]
                 [ text labelText ]
 
-        len =
-            div
-                [ style "background-color" color
-                , style "border-width" (px borderWidth)
-                , style "border-color" "white"
-                , style "border-style" "solid"
-                , style "border-radius" (px (diameter / 2))
-                , style "height" (px ((diameter - borderWidth * 2) / 3))
-                , style "width" (px (length + diameter / 3))
-                , style "position" "absolute"
-                , style "top" (px ((diameter - borderWidth * 2) / 3))
-                , style "left" (px (toFloat (i - 1) * length + (diameter - borderWidth * 2) / 3))
-                , onClick msg
-                ]
-                []
+        lenStyle =
+            [ style "background-color" color
+            , style "border-width" (px borderWidth)
+            , style "border-color" "white"
+            , style "border-style" "solid"
+            , style "border-radius" (px (diameter / 2))
+            , style "height" (px ((diameter - borderWidth * 2) / 3))
+            , style "width" (px (length + diameter / 3))
+            , style "position" "absolute"
+            , style "top" (px ((diameter - borderWidth * 2) / 3))
+            , style "left" (px (toFloat (i - 1) * length + (diameter - borderWidth * 2) / 3))
+            ]
+
+        ( circle, len ) =
+            case mMsg of
+                Just msg ->
+                    ( div (onClick msg :: circleStyle) [], div (onClick msg :: lenStyle) [] )
+
+                Nothing ->
+                    ( div circleStyle [], div lenStyle [] )
     in
     if final then
         [ circle, label ]
