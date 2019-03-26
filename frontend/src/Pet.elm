@@ -75,29 +75,23 @@ update msg s =
 -- A Nothing means there is no next state.
 
 
-describeNext : RecordState -> Maybe String
-describeNext next =
-    case next of
-        NotStarted ->
-            Just "Start"
+describeIndex : Int -> String
+describeIndex i =
+    case i of
+        0 ->
+            "Start"
 
-        Started _ ->
-            Just "Somewhat Hard"
+        1 ->
+            "Somewhat Hard"
 
-        SomewhatHard _ ->
-            Just "Between Somewhat Hard and Hard"
+        3 ->
+            "Hard"
 
-        SomewhatHard2 _ _ ->
-            Just "Hard"
+        5 ->
+            "Very Hard"
 
-        Hard _ _ _ ->
-            Just "Between Hard and Very Hard"
-
-        Hard2 _ _ _ _ ->
-            Just "Very Hard"
-
-        Done _ _ _ _ ->
-            Nothing
+        _ ->
+            ""
 
 
 isNothing : Maybe a -> Bool
@@ -113,26 +107,45 @@ isNothing m =
 view : Model -> Html Msg
 view ( _, state ) =
     let
-        description =
-            describeNext state
+        positionIndex =
+            case state of
+                NotStarted ->
+                    0
+
+                Started _ ->
+                    1
+
+                SomewhatHard _ ->
+                    2
+
+                SomewhatHard2 _ _ ->
+                    3
+
+                Hard _ _ _ ->
+                    4
+
+                Hard2 _ _ _ _ ->
+                    5
+
+                Done _ _ _ _ ->
+                    6
     in
-    div []
-        [ button
-            [ onClick Record
-            , disabled (isNothing description)
-            ]
-            [ text <| Maybe.withDefault "Done!" <| description ]
-        , links
-            60
-            125
-            [ LinkConfig "Start" "#23ba2d" Nothing
-            , LinkConfig "Somewhat Hard" "#23ba2d" Nothing
-            , LinkConfig "" "#23ba2d" Nothing
-            , LinkConfig "Hard" "#baad23" (Just Record)
-            , LinkConfig "" "grey" Nothing
-            , LinkConfig "Very Hard" "grey" Nothing
-            ]
-        ]
+    links
+        60
+        125
+        (List.map
+            (\i ->
+                if i < positionIndex then
+                    LinkConfig (describeIndex i) "#23ba2d" Nothing
+
+                else if i == positionIndex then
+                    LinkConfig (describeIndex i) "#baad23" (Just Record)
+
+                else
+                    LinkConfig (describeIndex i) "grey" Nothing
+            )
+            (List.range 0 5)
+        )
 
 
 px : Float -> String
