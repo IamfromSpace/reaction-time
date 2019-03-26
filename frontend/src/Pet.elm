@@ -122,7 +122,16 @@ view ( _, state ) =
             , disabled (isNothing description)
             ]
             [ text <| Maybe.withDefault "Done!" <| description ]
-        , links 50 100 [ ( "red", Record ), ( "blue", Record ), ( "blue", Record ) ]
+        , links
+            60
+            125
+            [ LinkConfig "Start" "#23ba2d" Record
+            , LinkConfig "Somewhat Hard" "#23ba2d" Record
+            , LinkConfig "" "#23ba2d" Record
+            , LinkConfig "Hard" "#baad23" Record
+            , LinkConfig "" "grey" Record
+            , LinkConfig "Very Hard" "grey" Record
+            ]
         ]
 
 
@@ -131,13 +140,20 @@ px i =
     (\x -> x ++ "px") <| String.fromFloat i
 
 
-links : Float -> Float -> List ( String, Msg ) -> Html Msg
+type alias LinkConfig m =
+    { label : String
+    , color : String
+    , msg : m
+    }
+
+
+links : Float -> Float -> List (LinkConfig Msg) -> Html Msg
 links diameter length colorsAndMsgs =
     div [ style "position" "relative" ] <|
         Tuple.first <|
             List.foldl
-                (\( color, msg ) ( xs, i ) ->
-                    ( xs ++ linkPair (i == 0) i diameter length color msg
+                (\{ color, msg, label } ( xs, i ) ->
+                    ( xs ++ linkPair (i == 0) i diameter length label color msg
                     , i + 1
                     )
                 )
@@ -145,8 +161,8 @@ links diameter length colorsAndMsgs =
                 colorsAndMsgs
 
 
-linkPair : Bool -> Int -> Float -> Float -> String -> Msg -> List (Html Msg)
-linkPair final i diameter length color msg =
+linkPair : Bool -> Int -> Float -> Float -> String -> String -> Msg -> List (Html Msg)
+linkPair final i diameter length labelText color msg =
     let
         borderWidth =
             diameter / 15
@@ -158,6 +174,7 @@ linkPair final i diameter length color msg =
                 , style "border-color" "white"
                 , style "border-style" "solid"
                 , style "border-radius" (px diameter)
+                , style "box-shadow" "5px 5px 10px lightgrey"
                 , style "height" (px (diameter - borderWidth * 2))
                 , style "width" (px (diameter - borderWidth * 2))
                 , style "position" "absolute"
@@ -166,6 +183,17 @@ linkPair final i diameter length color msg =
                 , onClick msg
                 ]
                 []
+
+        label =
+            div
+                [ style "width" (px (length * 0.8))
+                , style "position" "absolute"
+                , style "text-align" "center"
+                , style "font-size" (px (diameter * 0.25))
+                , style "top" (px (diameter * 1.1))
+                , style "left" (px ((toFloat i - 0.15) * length))
+                ]
+                [ text labelText ]
 
         len =
             div
@@ -184,10 +212,10 @@ linkPair final i diameter length color msg =
                 []
     in
     if final then
-        [ circle ]
+        [ circle, label ]
 
     else
-        [ len, circle ]
+        [ len, circle, label ]
 
 
 main : Program () Model Msg
