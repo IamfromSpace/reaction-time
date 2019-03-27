@@ -1,4 +1,4 @@
-module Main exposing (main)
+module Pet exposing (Model, Msg, TestResult, initialModel, update, view)
 
 import Browser exposing (element)
 import Html exposing (Html, div, text)
@@ -42,32 +42,54 @@ toSiDuration t1 t0 =
     toFloat (posixToMillis t1 - posixToMillis t0) / 1000
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+type alias TestResult =
+    { somewhatHard2 : Float
+    , hard : Float
+    , hard2 : Float
+    , veryHard : Float
+    }
+
+
+update : Msg -> Model -> ( Maybe TestResult, ( Model, Cmd Msg ) )
 update msg s =
     case ( msg, s ) of
         ( Record, ( False, _ ) ) ->
-            ( ( True, Tuple.second s ), Task.perform Recorded now )
+            ( Nothing
+            , ( ( True, Tuple.second s ), Task.perform Recorded now )
+            )
 
         ( Recorded t, ( True, NotStarted ) ) ->
-            ( ( False, Started t ), Cmd.none )
+            ( Nothing
+            , ( ( False, Started t ), Cmd.none )
+            )
 
         ( Recorded _, ( True, Started t0 ) ) ->
-            ( ( False, SomewhatHard t0 ), Cmd.none )
+            ( Nothing
+            , ( ( False, SomewhatHard t0 ), Cmd.none )
+            )
 
         ( Recorded t, ( True, SomewhatHard t0 ) ) ->
-            ( ( False, SomewhatHard2 t0 (toSiDuration t t0) ), Cmd.none )
+            ( Nothing
+            , ( ( False, SomewhatHard2 t0 (toSiDuration t t0) ), Cmd.none )
+            )
 
         ( Recorded t, ( True, SomewhatHard2 t0 t1 ) ) ->
-            ( ( False, Hard t0 t1 (toSiDuration t t0) ), Cmd.none )
+            ( Nothing
+            , ( ( False, Hard t0 t1 (toSiDuration t t0) ), Cmd.none )
+            )
 
         ( Recorded t, ( True, Hard t0 t1 t2 ) ) ->
-            ( ( False, Hard2 t0 t1 t2 (toSiDuration t t0) ), Cmd.none )
+            ( Nothing
+            , ( ( False, Hard2 t0 t1 t2 (toSiDuration t t0) ), Cmd.none )
+            )
 
         ( Recorded t, ( True, Hard2 t0 t1 t2 t3 ) ) ->
-            ( ( False, Done t1 t2 t3 (toSiDuration t t0) ), Cmd.none )
+            ( Just <| TestResult t1 t2 t3 (toSiDuration t t0)
+            , ( ( False, Done t1 t2 t3 (toSiDuration t t0) ), Cmd.none )
+            )
 
         _ ->
-            ( s, Cmd.none )
+            ( Nothing, ( s, Cmd.none ) )
 
 
 
@@ -236,6 +258,6 @@ main =
     element
         { init = \_ -> ( initialModel, Cmd.none )
         , view = view
-        , update = update
+        , update = \x y -> Tuple.second <| update x y
         , subscriptions = \_ -> Sub.none
         }
