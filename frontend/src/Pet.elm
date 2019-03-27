@@ -1,8 +1,7 @@
 module Main exposing (main)
 
 import Browser exposing (element)
-import Dict exposing (Dict)
-import Html exposing (Html, button, div, text)
+import Html exposing (Html, div, text)
 import Html.Attributes exposing (disabled, style)
 import Html.Events exposing (onClick)
 import Platform.Cmd exposing (Cmd)
