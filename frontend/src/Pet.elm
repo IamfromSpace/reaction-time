@@ -131,8 +131,8 @@ view ( _, state ) =
                     6
     in
     links
-        60
-        125
+        (100 / 6 / 1.414)
+        (100 / 6)
         (List.map
             (\i ->
                 if i < positionIndex then
@@ -148,9 +148,9 @@ view ( _, state ) =
         )
 
 
-px : Float -> String
-px i =
-    (\x -> x ++ "px") <| String.fromFloat i
+vw : Float -> String
+vw i =
+    (\x -> x ++ "vw") <| String.fromFloat i
 
 
 type alias LinkConfig m =
@@ -182,39 +182,39 @@ linkPair final i diameter length labelText color mMsg =
 
         circleStyle =
             [ style "background-color" color
-            , style "border-width" (px borderWidth)
+            , style "border-width" (vw borderWidth)
             , style "border-color" "white"
             , style "border-style" "solid"
-            , style "border-radius" (px diameter)
-            , style "height" (px (diameter - borderWidth * 2))
-            , style "width" (px (diameter - borderWidth * 2))
+            , style "border-radius" (vw diameter)
+            , style "height" (vw (diameter - borderWidth * 2))
+            , style "width" (vw (diameter - borderWidth * 2))
             , style "position" "absolute"
-            , style "top" (px 0)
-            , style "left" (px (toFloat i * length))
+            , style "top" (vw 0)
+            , style "left" (vw (toFloat i * length))
             ]
 
         label =
             div
-                [ style "width" (px (length * 0.8))
+                [ style "width" (vw (length * 0.8))
                 , style "position" "absolute"
                 , style "text-align" "center"
-                , style "font-size" (px (diameter * 0.25))
-                , style "top" (px (diameter * 1.1))
-                , style "left" (px (((toFloat i - 0.4) * length) + 0.5 * diameter))
+                , style "font-size" (vw (diameter * 0.25))
+                , style "top" (vw (diameter * 1.1))
+                , style "left" (vw (((toFloat i - 0.4) * length) + 0.5 * diameter))
                 ]
                 [ text labelText ]
 
         lenStyle =
             [ style "background-color" color
-            , style "border-width" (px borderWidth)
+            , style "border-width" (vw borderWidth)
             , style "border-color" "white"
             , style "border-style" "solid"
-            , style "border-radius" (px (diameter / 2))
-            , style "height" (px ((diameter - borderWidth * 2) / 3))
-            , style "width" (px (length + diameter / 3))
+            , style "border-radius" (vw (diameter / 2))
+            , style "height" (vw ((diameter - borderWidth * 2) / 3))
+            , style "width" (vw (length + diameter / 3))
             , style "position" "absolute"
-            , style "top" (px ((diameter - borderWidth * 2) / 3))
-            , style "left" (px (toFloat (i - 1) * length + (diameter - borderWidth * 2) / 3))
+            , style "top" (vw ((diameter - borderWidth * 2) / 3))
+            , style "left" (vw (toFloat (i - 1) * length + (diameter - borderWidth * 2) / 3))
             ]
 
         ( circle, len ) =
