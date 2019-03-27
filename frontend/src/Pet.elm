@@ -200,7 +200,7 @@ linkPair final i diameter length labelText color mMsg =
                 , style "text-align" "center"
                 , style "font-size" (px (diameter * 0.25))
                 , style "top" (px (diameter * 1.1))
-                , style "left" (px ((toFloat i - 0.15) * length))
+                , style "left" (px (((toFloat i - 0.4) * length) + 0.5 * diameter))
                 ]
                 [ text labelText ]
 
