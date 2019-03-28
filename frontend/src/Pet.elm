@@ -1,4 +1,4 @@
-module Pet exposing (Model, Msg, TestResult, initialModel, update, view)
+module Pet exposing (Model, Msg, TestResult, initialModel, toPoints, update, view)
 
 import Browser exposing (element)
 import Html exposing (Html, div, text)
@@ -48,6 +48,11 @@ type alias TestResult =
     , hard2 : Float
     , veryHard : Float
     }
+
+
+toPoints : TestResult -> List ( Float, Float )
+toPoints { somewhatHard2, hard, hard2, veryHard } =
+    [ ( 14, somewhatHard2 ), ( 15, hard ), ( 16, hard2 ), ( 17, veryHard ) ]
 
 
 update : Msg -> Model -> ( Maybe TestResult, ( Model, Cmd Msg ) )

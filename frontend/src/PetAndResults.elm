@@ -55,11 +55,13 @@ view state =
 
 
 resultView : Pet.TestResult -> Html a
-resultView { somewhatHard2, hard, hard2, veryHard } =
+resultView ({ somewhatHard2, hard, hard2, veryHard } as result) =
     let
-        -- TODO
+        ( slope, intercept ) =
+            linearRegression (Pet.toPoints result)
+
         estimate =
-            0.1
+            20 * slope + intercept
     in
     div []
         [ div [] [ text <| "Between Somewhat Hard and Hard: " ++ String.fromFloat somewhatHard2 ++ "s" ]
@@ -68,6 +70,39 @@ resultView { somewhatHard2, hard, hard2, veryHard } =
         , div [] [ text <| "Very Hard: " ++ String.fromFloat veryHard ++ "s" ]
         , div [] [ text <| "Max Time (estimate): " ++ String.fromFloat estimate ++ "s" ]
         ]
+
+
+linearRegression : List ( Float, Float ) -> ( Float, Float )
+linearRegression ps =
+    let
+        ( xs, ys ) =
+            List.unzip ps
+
+        sigmaX =
+            List.sum xs
+
+        sigmaY =
+            List.sum ys
+
+        sigmaXY =
+            List.sum <| List.map (\( x, y ) -> x * y) ps
+
+        sigmaX2 =
+            List.sum <| List.map (\x -> x * x) xs
+
+        sigmaY2 =
+            List.sum <| List.map (\y -> y * y) ys
+
+        n =
+            toFloat <| List.length ps
+
+        slope =
+            (n * sigmaXY - sigmaX * sigmaY) / (n * sigmaX2 - sigmaX ^ 2)
+
+        intercept =
+            (sigmaY * sigmaX2 - sigmaX * sigmaXY) / (n * sigmaX2 - sigmaX ^ 2)
+    in
+    ( slope, intercept )
 
 
 main : Program () Model Msg
