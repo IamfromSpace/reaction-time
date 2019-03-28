@@ -1,7 +1,7 @@
 module Login exposing (Model, Msg, init, initModel, update, view)
 
 import Browser exposing (element)
-import CognitoClient exposing (login)
+import CognitoClient exposing (LoginResult(..), answerNewPasswordChallenge, login)
 import Html exposing (Html, button, div, form, input, label, text)
 import Html.Attributes exposing (disabled, style, type_, value)
 import Html.Events exposing (onInput, onSubmit)
@@ -12,7 +12,7 @@ import Platform.Cmd exposing (Cmd)
 
 initModel : Model
 initModel =
-    { email = "", password = "", loading = False, lastError = Nothing }
+    { email = "", password = "", session = Nothing, loading = False, lastError = Nothing }
 
 
 init : ( Model, Cmd Msg )
@@ -21,72 +21,115 @@ init =
 
 
 type alias Model =
-    { email : String, password : String, loading : Bool, lastError : Maybe Error }
+    { email : String, password : String, session : Maybe String, loading : Bool, lastError : Maybe Error }
 
 
 type Msg
     = UpdateEmail String
     | UpdatePassword String
     | RequestToken
-    | ReceiveToken (Result Error String)
+    | RequestNewPassword String
+    | ReceiveError Error
+    | ReceiveToken String
+    | ReceiveChallenge String
+
+
+loginResponseToMsg : Result Error CognitoClient.LoginResult -> Msg
+loginResponseToMsg result =
+    case result of
+        Ok (LoggedIn token) ->
+            ReceiveToken token
+
+        Ok (NewPasswordRequired session) ->
+            ReceiveChallenge session
+
+        Err e ->
+            ReceiveError e
+
+
+challengeResponseToMsg : Result Error String -> Msg
+challengeResponseToMsg result =
+    case result of
+        Ok token ->
+            ReceiveToken token
+
+        Err e ->
+            ReceiveError e
 
 
 update : String -> Msg -> Model -> ( ( Model, Cmd Msg ), Maybe String )
-update clientId msg { email, password, loading, lastError } =
+update clientId msg ({ email, password, loading, lastError } as s) =
     case ( msg, loading ) of
         ( UpdateEmail new, False ) ->
-            ( ( { email = new, password = password, loading = loading, lastError = lastError }
-              , Cmd.none
-              )
-            , Nothing
-            )
+            ( ( { s | email = new }, Cmd.none ), Nothing )
 
         ( UpdatePassword new, False ) ->
-            ( ( { email = email, password = new, loading = loading, lastError = lastError }
-              , Cmd.none
-              )
-            , Nothing
-            )
+            ( ( { s | password = new }, Cmd.none ), Nothing )
 
         ( RequestToken, False ) ->
-            ( ( { email = email, password = password, loading = True, lastError = Nothing }
-              , Cmd.map ReceiveToken <| login clientId email password
+            ( ( { s | loading = True, lastError = Nothing }
+              , Cmd.map loginResponseToMsg <| login clientId email password
               )
             , Nothing
             )
 
-        ( ReceiveToken r, True ) ->
-            case r of
-                Ok token ->
-                    ( ( { email = "", password = "", loading = False, lastError = Nothing }
-                      , Cmd.none
-                      )
-                    , Just token
-                    )
+        ( RequestNewPassword session, False ) ->
+            ( ( { s | loading = True, lastError = Nothing }
+              , Cmd.map challengeResponseToMsg <| answerNewPasswordChallenge session clientId email password
+              )
+            , Nothing
+            )
 
-                Err e ->
-                    ( ( { email = email, password = password, loading = False, lastError = Just e }
-                      , Cmd.none
-                      )
-                    , Nothing
-                    )
+        ( ReceiveToken token, True ) ->
+            ( ( { email = ""
+                , password = ""
+                , loading = False
+                , lastError = Nothing
+                , session = Nothing
+                }
+              , Cmd.none
+              )
+            , Just token
+            )
 
-        ( _, _ ) ->
-            ( ( { email = email, password = password, loading = loading, lastError = lastError }
+        ( ReceiveChallenge session, True ) ->
+            ( ( { s | password = "", loading = False, lastError = Nothing, session = Just session }
               , Cmd.none
               )
             , Nothing
             )
+
+        ( ReceiveError e, True ) ->
+            ( ( { s | loading = False, lastError = Just e }, Cmd.none ), Nothing )
+
+        ( _, _ ) ->
+            ( ( s, Cmd.none ), Nothing )
 
 
 view : Model -> Html Msg
-view { email, password, loading, lastError } =
-    form [ onSubmit RequestToken ]
+view { email, password, loading, lastError, session } =
+    form
+        [ onSubmit <|
+            case session of
+                Nothing ->
+                    RequestToken
+
+                Just s ->
+                    RequestNewPassword s
+        ]
         [ label [] [ text "Email" ]
         , input [ onInput UpdateEmail, type_ "email", value email, disabled loading ] []
         , label [] [ text "Password" ]
         , input [ onInput UpdatePassword, type_ "password", value password, disabled loading ] []
-        , button [ disabled loading ] [ text "Login" ]
+        , button [ disabled loading ]
+            [ text <|
+                case session of
+                    Nothing ->
+                        "Login"
+
+                    Just _ ->
+                        "Update Password"
+            ]
         , text <|
             case lastError of
                 Nothing ->
