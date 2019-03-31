@@ -206,12 +206,21 @@ linkPair final i diameter length labelText color mMsg =
         borderWidth =
             diameter / 15
 
+        shadowOffset =
+            vw (diameter / 10)
+
+        shadowBlur =
+            vw (diameter / 5)
+
         circleStyle =
             [ style "background-color" color
             , style "border-width" (vw borderWidth)
             , style "border-color" "white"
             , style "border-style" "solid"
             , style "border-radius" (vw diameter)
+            , style
+                "box-shadow"
+                (shadowOffset ++ " " ++ shadowOffset ++ " " ++ shadowBlur ++ " lightgrey")
             , style "height" (vw (diameter - borderWidth * 2))
             , style "width" (vw (diameter - borderWidth * 2))
             , style "position" "absolute"
