@@ -55,8 +55,8 @@ type Msg
     | ReceiveSubmitResult (Maybe RtError)
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg ({ testState, loginState } as s) =
+update : Login.LoginUpdate -> Msg -> Model -> ( Model, Cmd Msg )
+update loginUpdate msg ({ testState, loginState } as s) =
     case ( msg, loginState, testState ) of
         ( StartLogin, NotLoggedIn, _ ) ->
             ( { s | loginState = LoggingIn Login.initModel }, Cmd.none )
@@ -64,7 +64,7 @@ update msg ({ testState, loginState } as s) =
         ( LoginMsg m, LoggingIn x, _ ) ->
             let
                 ( ( next, cmds ), maybeNotifications ) =
-                    Login.update "1hc2128v5ffkeokim4uvbpjmj7" m x
+                    loginUpdate m x
             in
             case maybeNotifications of
                 Nothing ->
@@ -237,6 +237,6 @@ main =
     element
         { init = \_ -> ( initialModel, Cmd.none )
         , view = view
-        , update = update
+        , update = update <| Login.update "XXX"
         , subscriptions = sub
         }

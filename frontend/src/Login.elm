@@ -1,4 +1,4 @@
-module Login exposing (Model, Msg, init, initModel, update, view)
+module Login exposing (LoginUpdate, Model, Msg, init, initModel, update, view)
 
 import Browser exposing (element)
 import CognitoClient exposing (LoginResult(..), answerNewPasswordChallenge, login)
@@ -57,7 +57,11 @@ challengeResponseToMsg result =
             ReceiveError e
 
 
-update : String -> Msg -> Model -> ( ( Model, Cmd Msg ), Maybe String )
+type alias LoginUpdate =
+    Msg -> Model -> ( ( Model, Cmd Msg ), Maybe String )
+
+
+update : String -> LoginUpdate
 update clientId msg ({ email, password, loading, lastError } as s) =
     case ( msg, loading ) of
         ( UpdateEmail new, False ) ->
@@ -161,7 +165,7 @@ main =
             \msg model ->
                 let
                     ( x, _ ) =
-                        update "1hc2128v5ffkeokim4uvbpjmj7" msg model
+                        update "XXX" msg model
                 in
                 x
         , subscriptions = \_ -> Sub.none
