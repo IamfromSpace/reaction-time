@@ -1,8 +1,9 @@
-module RtServerClient exposing (RtError(..), reportResult)
+module RtServerClient exposing (RtError(..), RtReporter, RtResult, reportResult, successReporter)
 
 import Http exposing (Error(..), expectString, header, jsonBody, request)
 import Iso8601 exposing (fromTime)
 import Json.Encode exposing (Value, float, int, object, string)
+import Task
 import Time exposing (Posix)
 
 
@@ -52,7 +53,11 @@ rtResultToValue { averageSeconds, successCount, testCount, dateTime } =
         ]
 
 
-reportResult : String -> String -> RtResult -> Cmd (Maybe RtError)
+type alias RtReporter =
+    RtResult -> Cmd (Maybe RtError)
+
+
+reportResult : String -> String -> RtReporter
 reportResult url token rtResult =
     request
         { method = "POST"
@@ -77,3 +82,8 @@ reportResult url token rtResult =
         , timeout = Just 5000
         , tracker = Nothing
         }
+
+
+successReporter : RtReporter
+successReporter _ =
+    Task.perform identity <| Task.succeed Nothing
