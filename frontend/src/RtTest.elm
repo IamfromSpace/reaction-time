@@ -1,4 +1,4 @@
-module RtTest exposing (Model, Msg, initialModel, isRunning, sub, update, view)
+module RtTest exposing (Model, Msg, Update, initialModel, isRunning, sub, update, view)
 
 import Browser exposing (element)
 import Html exposing (Html, button, div, text)
@@ -47,8 +47,12 @@ type Msg
     | ReceiveSubmitResult (Maybe RtError)
 
 
-update : Maybe RtReporter -> Msg -> Model -> ( Model, Cmd Msg )
-update mReportResult msg testState =
+type alias Update =
+    Msg -> Model -> ( Model, Cmd Msg )
+
+
+update : Int -> Maybe RtReporter -> Update
+update runs mReportResult msg testState =
     case ( msg, mReportResult, testState ) of
         ( StartTest, _, NotStarted ) ->
             ( Running MultiTest.initModel, Cmd.none )
@@ -56,7 +60,7 @@ update mReportResult msg testState =
         ( TestMsg testMsg, _, Running ts ) ->
             let
                 { next, notifications, cmds } =
-                    MultiTest.update 80 testMsg ts
+                    MultiTest.update runs testMsg ts
             in
             case notifications of
                 Just ( posix, history ) ->

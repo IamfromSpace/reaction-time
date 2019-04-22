@@ -10,6 +10,6 @@ main =
     element
         { init = \_ -> ( initialModel, Cmd.none )
         , view = view True
-        , update = update <| Just RtServerClient.successReporter
+        , update = update 4 <| Just RtServerClient.successReporter
         , subscriptions = sub
         }

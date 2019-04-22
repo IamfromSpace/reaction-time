@@ -57,8 +57,14 @@ type Msg
     | StartLogin
 
 
-update : ( String -> RtReporter, Login.LoginUpdate ) -> Msg -> Model -> ( Model, Cmd Msg )
-update ( mkReporter, loginUpdate ) msg ({ rtTestState, petState, loginState } as s) =
+type alias Config =
+    { mkRtTestUpdate : Maybe String -> RtTest.Update
+    , loginUpdate : Login.LoginUpdate
+    }
+
+
+update : Config -> Msg -> Model -> ( Model, Cmd Msg )
+update { mkRtTestUpdate, loginUpdate } msg ({ rtTestState, petState, loginState } as s) =
     case ( msg, loginState ) of
         ( StartLogin, NotLoggedIn ) ->
             ( { s | loginState = LoggingIn Login.initModel }, Cmd.none )
@@ -84,16 +90,16 @@ update ( mkReporter, loginUpdate ) msg ({ rtTestState, petState, loginState } as
 
         ( RtTestMsg testMsg, _ ) ->
             let
-                updater =
+                mToken =
                     case loginState of
                         LoggedIn token ->
-                            RtTest.update <| Just <| mkReporter token
+                            Just token
 
                         _ ->
-                            RtTest.update Nothing
+                            Nothing
 
                 ( next, cmds ) =
-                    updater testMsg rtTestState
+                    mkRtTestUpdate mToken testMsg rtTestState
             in
             ( { s | rtTestState = next }, Cmd.map RtTestMsg cmds )
 
