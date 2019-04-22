@@ -1,4 +1,4 @@
-module RtTest exposing (Model, Msg, initialModel, sub, update, view)
+module RtTest exposing (Model, Msg, initialModel, isRunning, sub, update, view)
 
 import Browser exposing (element)
 import Html exposing (Html, button, div, text)
@@ -21,6 +21,16 @@ type Model
     | Running MultiTest.Model
       -- TODO: This data may make sense as a sub Model
     | Done Posix (List (Maybe Float)) SubmitState
+
+
+isRunning : Model -> Bool
+isRunning model =
+    case model of
+        Running _ ->
+            True
+
+        _ ->
+            False
 
 
 type SubmitState

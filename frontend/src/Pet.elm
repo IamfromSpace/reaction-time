@@ -1,4 +1,4 @@
-module Pet exposing (Model, Msg, TestResult, initialModel, toPoints, update, view)
+module Pet exposing (Model, Msg, TestResult, initialModel, isRunning, toPoints, update, view)
 
 import Browser exposing (element)
 import Html exposing (Html, div, text)
@@ -34,6 +34,11 @@ type alias Model =
     { waitingForTime : Bool
     , recordState : RecordState
     }
+
+
+isRunning : Model -> Bool
+isRunning { waitingForTime, recordState } =
+    not waitingForTime && recordState /= NotStarted
 
 
 type Msg

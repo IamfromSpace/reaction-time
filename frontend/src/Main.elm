@@ -34,6 +34,16 @@ type alias Model =
     }
 
 
+isRunning : Model -> Bool
+isRunning { currentTest, petState, rtTestState } =
+    case currentTest of
+        RtTest ->
+            RtTest.isRunning rtTestState
+
+        Pet ->
+            PetAndResults.isRunning petState
+
+
 type LoginState
     = NotLoggedIn
     | LoggingIn Login.Model
@@ -89,18 +99,25 @@ update ( mkReporter, loginUpdate ) msg ({ rtTestState, petState, loginState } as
             ( { s | rtTestState = next }, Cmd.map RtTestMsg cmds )
 
         ( SelectTest test, _ ) ->
-            ( { s | currentTest = test }, Cmd.none )
+            if isRunning s then
+                ( s, Cmd.none )
+
+            else
+                ( { s | currentTest = test }, Cmd.none )
 
         _ ->
             ( s, Cmd.none )
 
 
 view : Model -> Html Msg
-view { rtTestState, petState, loginState, currentTest } =
+view ({ rtTestState, petState, loginState, currentTest } as s) =
     let
+        ifRunning =
+            disabled (isRunning s)
+
         selectorButtons =
-            [ button [ onClick (SelectTest RtTest) ] [ text "Reaction Time" ]
-            , button [ onClick (SelectTest Pet) ] [ text "PET" ]
+            [ button [ onClick (SelectTest RtTest), ifRunning ] [ text "Reaction Time" ]
+            , button [ onClick (SelectTest Pet), ifRunning ] [ text "PET" ]
             ]
 
         inner loggedIn =
@@ -119,7 +136,7 @@ view { rtTestState, petState, loginState, currentTest } =
 
             NotLoggedIn ->
                 [ div []
-                    (button [ onClick StartLogin ] [ text "Login" ]
+                    (button [ onClick StartLogin, ifRunning ] [ text "Login" ]
                         :: selectorButtons
                     )
                 , inner False

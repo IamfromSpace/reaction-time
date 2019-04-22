@@ -1,4 +1,4 @@
-module PetAndResults exposing (Model, Msg, initialModel, update, view)
+module PetAndResults exposing (Model, Msg, initialModel, isRunning, update, view)
 
 import Browser exposing (element)
 import Dict exposing (Dict)
@@ -19,6 +19,16 @@ initialModel =
 type Model
     = Testing Pet.Model
     | Done Pet.TestResult
+
+
+isRunning : Model -> Bool
+isRunning m =
+    case m of
+        Testing mInner ->
+            Pet.isRunning mInner
+
+        Done _ ->
+            False
 
 
 type alias Msg =
