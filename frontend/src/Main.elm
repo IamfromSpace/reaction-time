@@ -5,21 +5,31 @@ import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (disabled)
 import Html.Events exposing (onClick)
 import Login
+import PetAndResults
 import Platform.Cmd exposing (Cmd)
 import Platform.Sub exposing (Sub)
 import RtServerClient exposing (RtReporter, reportResult)
 import RtTest
 
 
+type PossibleTest
+    = RtTest
+    | Pet
+
+
 initialModel : Model
 initialModel =
-    { testState = RtTest.initialModel
+    { rtTestState = RtTest.initialModel
+    , petState = PetAndResults.initialModel
+    , currentTest = RtTest
     , loginState = NotLoggedIn
     }
 
 
 type alias Model =
-    { testState : RtTest.Model
+    { rtTestState : RtTest.Model
+    , petState : PetAndResults.Model
+    , currentTest : PossibleTest
     , loginState : LoginState
     }
 
@@ -32,12 +42,14 @@ type LoginState
 
 type Msg
     = RtTestMsg RtTest.Msg
+    | PetTestMsg PetAndResults.Msg
+    | SelectTest PossibleTest
     | LoginMsg Login.Msg
     | StartLogin
 
 
 update : ( String -> RtReporter, Login.LoginUpdate ) -> Msg -> Model -> ( Model, Cmd Msg )
-update ( mkReporter, loginUpdate ) msg ({ testState, loginState } as s) =
+update ( mkReporter, loginUpdate ) msg ({ rtTestState, petState, loginState } as s) =
     case ( msg, loginState ) of
         ( StartLogin, NotLoggedIn ) ->
             ( { s | loginState = LoggingIn Login.initModel }, Cmd.none )
@@ -54,6 +66,13 @@ update ( mkReporter, loginUpdate ) msg ({ testState, loginState } as s) =
                 Just token ->
                     ( { s | loginState = LoggedIn token }, Cmd.none )
 
+        ( PetTestMsg testMsg, _ ) ->
+            let
+                ( next, cmds ) =
+                    PetAndResults.update testMsg petState
+            in
+            ( { s | petState = next }, Cmd.map PetTestMsg cmds )
+
         ( RtTestMsg testMsg, _ ) ->
             let
                 updater =
@@ -65,16 +84,33 @@ update ( mkReporter, loginUpdate ) msg ({ testState, loginState } as s) =
                             RtTest.update Nothing
 
                 ( next, cmds ) =
-                    updater testMsg testState
+                    updater testMsg rtTestState
             in
-            ( { s | testState = next }, Cmd.map RtTestMsg cmds )
+            ( { s | rtTestState = next }, Cmd.map RtTestMsg cmds )
+
+        ( SelectTest test, _ ) ->
+            ( { s | currentTest = test }, Cmd.none )
 
         _ ->
             ( s, Cmd.none )
 
 
 view : Model -> Html Msg
-view { testState, loginState } =
+view { rtTestState, petState, loginState, currentTest } =
+    let
+        selectorButtons =
+            [ button [ onClick (SelectTest RtTest) ] [ text "Reaction Time" ]
+            , button [ onClick (SelectTest Pet) ] [ text "PET" ]
+            ]
+
+        inner loggedIn =
+            case currentTest of
+                RtTest ->
+                    Html.map RtTestMsg (RtTest.view loggedIn rtTestState)
+
+                Pet ->
+                    Html.map PetTestMsg (PetAndResults.view petState)
+    in
     div
         []
         (case loginState of
@@ -82,20 +118,26 @@ view { testState, loginState } =
                 [ Html.map LoginMsg (Login.view m) ]
 
             NotLoggedIn ->
-                [ button [ onClick StartLogin ] [ text "Login" ]
-                , Html.map RtTestMsg (RtTest.view False testState)
+                [ div []
+                    (button [ onClick StartLogin ] [ text "Login" ]
+                        :: selectorButtons
+                    )
+                , inner False
                 ]
 
             LoggedIn _ ->
-                [ button [ disabled True ] [ text "Logout" ]
-                , Html.map RtTestMsg (RtTest.view True testState)
+                [ div []
+                    (button [ disabled True ] [ text "Logout" ]
+                        :: selectorButtons
+                    )
+                , inner True
                 ]
         )
 
 
 sub : Model -> Sub Msg
-sub { testState } =
-    Sub.map RtTestMsg <| RtTest.sub testState
+sub { rtTestState } =
+    Sub.map RtTestMsg <| RtTest.sub rtTestState
 
 
 main : Program () Model Msg

@@ -1,4 +1,4 @@
-module Main exposing (main)
+module PetAndResults exposing (Model, Msg, initialModel, update, view)
 
 import Browser exposing (element)
 import Dict exposing (Dict)
