@@ -1,6 +1,5 @@
 module Login exposing (LoginUpdate, Model, Msg, init, initModel, update, view)
 
-import Browser exposing (element)
 import CognitoClient exposing (LoginResult(..), answerNewPasswordChallenge, login)
 import Html exposing (Html, button, div, form, input, label, text)
 import Html.Attributes exposing (disabled, style, type_, value)
@@ -154,19 +153,3 @@ view { email, password, loading, lastError, session } =
                 Just (BadUrl _) ->
                     "Tried to reach an unreachable endpoint"
         ]
-
-
-main : Program () Model Msg
-main =
-    element
-        { init = \_ -> init
-        , view = view
-        , update =
-            \msg model ->
-                let
-                    ( x, _ ) =
-                        update "XXX" msg model
-                in
-                x
-        , subscriptions = \_ -> Sub.none
-        }

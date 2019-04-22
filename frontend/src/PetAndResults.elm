@@ -1,6 +1,5 @@
 module PetAndResults exposing (Model, Msg, initialModel, isRunning, update, view)
 
-import Browser exposing (element)
 import Dict exposing (Dict)
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (disabled, style)
@@ -113,13 +112,3 @@ linearRegression ps =
             (sigmaY * sigmaX2 - sigmaX * sigmaXY) / (n * sigmaX2 - sigmaX ^ 2)
     in
     ( slope, intercept )
-
-
-main : Program () Model Msg
-main =
-    element
-        { init = \_ -> ( initialModel, Cmd.none )
-        , view = view
-        , update = update
-        , subscriptions = \_ -> Sub.none
-        }

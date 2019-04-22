@@ -200,13 +200,3 @@ sub testState =
 
         _ ->
             Sub.none
-
-
-main : Program () Model Msg
-main =
-    element
-        { init = \_ -> ( initialModel, Cmd.none )
-        , view = view True
-        , update = update <| Just RtServerClient.successReporter
-        , subscriptions = sub
-        }

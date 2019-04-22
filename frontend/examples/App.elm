@@ -11,6 +11,8 @@ main =
     element
         { init = \_ -> ( initialModel, Cmd.none )
         , view = view
+
+        -- TODO: More Testable
         , update = update <| ( reportResult "http://example.com", Login.update "XXX" )
         , subscriptions = sub
         }

@@ -1,6 +1,5 @@
 module Pet exposing (Model, Msg, TestResult, initialModel, isRunning, toPoints, update, view)
 
-import Browser exposing (element)
 import Html exposing (Html, div, text)
 import Html.Attributes exposing (disabled, style)
 import Html.Events exposing (onClick)
@@ -274,13 +273,3 @@ linkPair final i diameter length labelText color mMsg =
 
     else
         [ len, circle, label ]
-
-
-main : Program () Model Msg
-main =
-    element
-        { init = \_ -> ( initialModel, Cmd.none )
-        , view = view
-        , update = \x y -> Tuple.second <| update x y
-        , subscriptions = \_ -> Sub.none
-        }
