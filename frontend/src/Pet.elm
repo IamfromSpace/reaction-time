@@ -11,7 +11,9 @@ import Time exposing (Posix, now, posixToMillis)
 
 initialModel : Model
 initialModel =
-    ( False, NotStarted )
+    { waitingForTime = False
+    , recordState = NotStarted
+    }
 
 
 type RecordState
@@ -29,7 +31,9 @@ type RecordState
 
 
 type alias Model =
-    ( Bool, RecordState )
+    { waitingForTime : Bool
+    , recordState : RecordState
+    }
 
 
 type Msg
@@ -56,41 +60,41 @@ toPoints { somewhatHard2, hard, hard2, veryHard } =
 
 
 update : Msg -> Model -> ( Maybe TestResult, ( Model, Cmd Msg ) )
-update msg s =
-    case ( msg, s ) of
+update msg ({ waitingForTime, recordState } as s) =
+    case ( msg, ( waitingForTime, recordState ) ) of
         ( Record, ( False, _ ) ) ->
             ( Nothing
-            , ( ( True, Tuple.second s ), Task.perform Recorded now )
+            , ( { s | waitingForTime = True }, Task.perform Recorded now )
             )
 
         ( Recorded t, ( True, NotStarted ) ) ->
             ( Nothing
-            , ( ( False, Started t ), Cmd.none )
+            , ( { s | recordState = Started t, waitingForTime = False }, Cmd.none )
             )
 
         ( Recorded _, ( True, Started t0 ) ) ->
             ( Nothing
-            , ( ( False, SomewhatHard t0 ), Cmd.none )
+            , ( { s | recordState = SomewhatHard t0, waitingForTime = False }, Cmd.none )
             )
 
         ( Recorded t, ( True, SomewhatHard t0 ) ) ->
             ( Nothing
-            , ( ( False, SomewhatHard2 t0 (toSiDuration t t0) ), Cmd.none )
+            , ( { s | recordState = SomewhatHard2 t0 (toSiDuration t t0), waitingForTime = False }, Cmd.none )
             )
 
         ( Recorded t, ( True, SomewhatHard2 t0 t1 ) ) ->
             ( Nothing
-            , ( ( False, Hard t0 t1 (toSiDuration t t0) ), Cmd.none )
+            , ( { s | recordState = Hard t0 t1 (toSiDuration t t0), waitingForTime = False }, Cmd.none )
             )
 
         ( Recorded t, ( True, Hard t0 t1 t2 ) ) ->
             ( Nothing
-            , ( ( False, Hard2 t0 t1 t2 (toSiDuration t t0) ), Cmd.none )
+            , ( { s | recordState = Hard2 t0 t1 t2 (toSiDuration t t0), waitingForTime = False }, Cmd.none )
             )
 
         ( Recorded t, ( True, Hard2 t0 t1 t2 t3 ) ) ->
             ( Just <| TestResult t1 t2 t3 (toSiDuration t t0)
-            , ( ( False, Done t1 t2 t3 (toSiDuration t t0) ), Cmd.none )
+            , ( { s | recordState = Done t1 t2 t3 (toSiDuration t t0), waitingForTime = False }, Cmd.none )
             )
 
         _ ->
@@ -131,10 +135,10 @@ isNothing m =
 
 
 view : Model -> Html Msg
-view ( _, state ) =
+view { recordState } =
     let
         positionIndex =
-            case state of
+            case recordState of
                 NotStarted ->
                     0
 
