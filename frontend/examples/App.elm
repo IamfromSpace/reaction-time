@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import App exposing (Model, Msg, initialModel, sub, update, view)
 import Browser exposing (element)
+import CognitoClientMocks exposing (alwaysRequireChangePasswordWithSession, alwaysSucceedChangePasswordWithToken)
 import Login
 import RtServerClient exposing (successReporter)
 import RtTest
@@ -12,13 +13,15 @@ main =
     element
         { init = \_ -> ( initialModel, Cmd.none )
         , view = view
-
-        -- TODO: Still More Testable
         , update =
             update <|
                 { mkRtTestUpdate =
                     RtTest.update 4 << Maybe.map (always successReporter)
-                , loginUpdate = Login.update "XXX"
+                , loginUpdate =
+                    Login.update
+                        { login = alwaysRequireChangePasswordWithSession ""
+                        , answerNewPasswordChallenge = alwaysSucceedChangePasswordWithToken ""
+                        }
                 }
         , subscriptions = sub
         }

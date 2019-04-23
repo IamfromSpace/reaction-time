@@ -1,4 +1,4 @@
-module CognitoClient exposing (LoginResult(..), answerNewPasswordChallenge, login)
+module CognitoClient exposing (AnswerNewPasswordChallenge, Login, LoginResult(..), mkAnswerNewPasswordChallenge, mkLogin)
 
 import Http exposing (Error, expectJson, header, request, stringBody)
 import Json.Decode as D exposing (Decoder)
@@ -60,8 +60,12 @@ decodeLoginResponse =
         ]
 
 
-login : String -> String -> String -> Cmd (Result Error LoginResult)
-login clientId username password =
+type alias Login =
+    String -> String -> Cmd (Result Error LoginResult)
+
+
+mkLogin : String -> Login
+mkLogin clientId username password =
     request
         { method = "POST"
         , headers =
@@ -81,8 +85,12 @@ login clientId username password =
         }
 
 
-answerNewPasswordChallenge : String -> String -> String -> String -> Cmd (Result Error String)
-answerNewPasswordChallenge session clientId username password =
+type alias AnswerNewPasswordChallenge =
+    String -> String -> String -> Cmd (Result Error String)
+
+
+mkAnswerNewPasswordChallenge : String -> AnswerNewPasswordChallenge
+mkAnswerNewPasswordChallenge clientId session username password =
     request
         { method = "POST"
         , headers =

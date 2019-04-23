@@ -1,6 +1,6 @@
-module Login exposing (LoginUpdate, Model, Msg, init, initModel, update, view)
+module Login exposing (Config, LoginUpdate, Model, Msg, init, initModel, update, view)
 
-import CognitoClient exposing (LoginResult(..), answerNewPasswordChallenge, login)
+import CognitoClient exposing (AnswerNewPasswordChallenge, Login, LoginResult(..))
 import Html exposing (Html, button, div, form, input, label, text)
 import Html.Attributes exposing (disabled, style, type_, value)
 import Html.Events exposing (onInput, onSubmit)
@@ -60,8 +60,14 @@ type alias LoginUpdate =
     Msg -> Model -> ( ( Model, Cmd Msg ), Maybe String )
 
 
-update : String -> LoginUpdate
-update clientId msg ({ email, password, loading, lastError } as s) =
+type alias Config =
+    { login : Login
+    , answerNewPasswordChallenge : AnswerNewPasswordChallenge
+    }
+
+
+update : Config -> LoginUpdate
+update { login, answerNewPasswordChallenge } msg ({ email, password, loading, lastError } as s) =
     case ( msg, loading ) of
         ( UpdateEmail new, False ) ->
             ( ( { s | email = new }, Cmd.none ), Nothing )
@@ -71,14 +77,14 @@ update clientId msg ({ email, password, loading, lastError } as s) =
 
         ( RequestToken, False ) ->
             ( ( { s | loading = True, lastError = Nothing }
-              , Cmd.map loginResponseToMsg <| login clientId email password
+              , Cmd.map loginResponseToMsg <| login email password
               )
             , Nothing
             )
 
         ( RequestNewPassword session, False ) ->
             ( ( { s | loading = True, lastError = Nothing }
-              , Cmd.map challengeResponseToMsg <| answerNewPasswordChallenge session clientId email password
+              , Cmd.map challengeResponseToMsg <| answerNewPasswordChallenge session email password
               )
             , Nothing
             )

@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Browser exposing (element)
+import CognitoClientMocks exposing (alwaysRequireChangePasswordWithSession, alwaysSucceedChangePasswordWithToken)
 import Login exposing (LoginUpdate, Model, Msg, init, initModel, update, view)
 
 
@@ -11,10 +12,12 @@ main =
         , view = view
         , update =
             \msg model ->
-                let
-                    ( x, _ ) =
-                        update "XXX" msg model
-                in
-                x
+                Tuple.first <|
+                    update
+                        { login = alwaysRequireChangePasswordWithSession ""
+                        , answerNewPasswordChallenge = alwaysSucceedChangePasswordWithToken ""
+                        }
+                        msg
+                        model
         , subscriptions = \_ -> Sub.none
         }
