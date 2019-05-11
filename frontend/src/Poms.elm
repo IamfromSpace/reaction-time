@@ -85,6 +85,492 @@ type alias TestResult a =
     }
 
 
+type Feeling
+    = Tense
+    | Shaky
+    | OnEdge
+    | Panicky
+    | Relaxed
+    | Uneasy
+    | Restless
+    | Nervous
+    | Anxious
+    | Unhappy
+    | SorryForThingsDone
+    | Sad
+    | Blue
+    | Hopeless
+    | Unworthy
+    | Discouraged
+    | Lonely
+    | Miserable
+    | Gloomy
+    | Desperate
+    | Helpless
+    | Worthless
+    | Terrified
+    | Guilty
+    | Angry
+    | Peeved
+    | Grouchy
+    | Annoyed
+    | Resentful
+    | Bitter
+    | ReadyToFight
+    | Rebellious
+    | Deceived
+    | Furious
+    | BadTempered
+    | WornOut
+    | Listless
+    | Fatigued
+    | Exhausted
+    | Sluggish
+    | Weary
+    | Bushed
+    | Confused
+    | UnableToConcentrate
+    | Muddled
+    | Bewildered
+    | Efficient
+    | Forgetful
+    | UncertainAboutThings
+    | Lively
+    | Active
+    | Energetic
+    | Cheerful
+    | Alert
+    | FullOfPep
+    | Carefree
+    | Vigorous
+    | Friendly
+    | ClearHeaded
+    | Considerate
+    | Sympathetic
+    | Helpful
+    | GoodNatured
+    | Trusting
+
+
+showFeeling : Feeling -> String
+showFeeling feeling =
+    case feeling of
+        Tense ->
+            "Tense"
+
+        Shaky ->
+            "Shaky"
+
+        OnEdge ->
+            "On Edge"
+
+        Panicky ->
+            "Panicky"
+
+        Relaxed ->
+            "Relaxed"
+
+        Uneasy ->
+            "Uneasy"
+
+        Restless ->
+            "Restless"
+
+        Nervous ->
+            "Nervous"
+
+        Anxious ->
+            "Anxious"
+
+        Unhappy ->
+            "Unhappy"
+
+        SorryForThingsDone ->
+            "Sorry For Things Done"
+
+        Sad ->
+            "Sad"
+
+        Blue ->
+            "Blue"
+
+        Hopeless ->
+            "Hopeless"
+
+        Unworthy ->
+            "Unworthy"
+
+        Discouraged ->
+            "Discouraged"
+
+        Lonely ->
+            "Lonely"
+
+        Miserable ->
+            "Miserable"
+
+        Gloomy ->
+            "Gloomy"
+
+        Desperate ->
+            "Desperate"
+
+        Helpless ->
+            "Helpless"
+
+        Worthless ->
+            "Worthless"
+
+        Terrified ->
+            "Terrified"
+
+        Guilty ->
+            "Guilty"
+
+        Angry ->
+            "Angry"
+
+        Peeved ->
+            "Peeved"
+
+        Grouchy ->
+            "Grouchy"
+
+        Annoyed ->
+            "Annoyed"
+
+        Resentful ->
+            "Resentful"
+
+        Bitter ->
+            "Bitter"
+
+        ReadyToFight ->
+            "Ready To Fight"
+
+        Rebellious ->
+            "Rebellious"
+
+        Deceived ->
+            "Deceived"
+
+        Furious ->
+            "Furious"
+
+        BadTempered ->
+            "Bad Tempered"
+
+        WornOut ->
+            "Worn Out"
+
+        Listless ->
+            "Listless"
+
+        Fatigued ->
+            "Fatigued"
+
+        Exhausted ->
+            "Exhausted"
+
+        Sluggish ->
+            "Sluggish"
+
+        Weary ->
+            "Weary"
+
+        Bushed ->
+            "Bushed"
+
+        Confused ->
+            "Confused"
+
+        UnableToConcentrate ->
+            "Unable To Concentrate"
+
+        Muddled ->
+            "Muddled"
+
+        Bewildered ->
+            "Bewildered"
+
+        Efficient ->
+            "Efficient"
+
+        Forgetful ->
+            "Forgetful"
+
+        UncertainAboutThings ->
+            "Uncertain About Things"
+
+        Lively ->
+            "Lively"
+
+        Active ->
+            "Active"
+
+        Energetic ->
+            "Energetic"
+
+        Cheerful ->
+            "Cheerful"
+
+        Alert ->
+            "Alert"
+
+        FullOfPep ->
+            "Full Of Pep"
+
+        Carefree ->
+            "Carefree"
+
+        Vigorous ->
+            "Vigorous"
+
+        Friendly ->
+            "Friendly"
+
+        ClearHeaded ->
+            "Clear Headed"
+
+        Considerate ->
+            "Considerate"
+
+        Sympathetic ->
+            "Sympathetic"
+
+        Helpful ->
+            "Helpful"
+
+        GoodNatured ->
+            "Good Natured"
+
+        Trusting ->
+            "Trusting"
+
+
+allFeelings : List Feeling
+allFeelings =
+    [ Tense
+    , Shaky
+    , OnEdge
+    , Panicky
+    , Relaxed
+    , Uneasy
+    , Restless
+    , Nervous
+    , Anxious
+    , Unhappy
+    , SorryForThingsDone
+    , Sad
+    , Blue
+    , Hopeless
+    , Unworthy
+    , Discouraged
+    , Lonely
+    , Miserable
+    , Gloomy
+    , Desperate
+    , Helpless
+    , Worthless
+    , Terrified
+    , Guilty
+    , Angry
+    , Peeved
+    , Grouchy
+    , Annoyed
+    , Resentful
+    , Bitter
+    , ReadyToFight
+    , Rebellious
+    , Deceived
+    , Furious
+    , BadTempered
+    , WornOut
+    , Listless
+    , Fatigued
+    , Exhausted
+    , Sluggish
+    , Weary
+    , Bushed
+    , Confused
+    , UnableToConcentrate
+    , Muddled
+    , Bewildered
+    , Efficient
+    , Forgetful
+    , UncertainAboutThings
+    , Lively
+    , Active
+    , Energetic
+    , Cheerful
+    , Alert
+    , FullOfPep
+    , Carefree
+    , Vigorous
+    , Friendly
+    , ClearHeaded
+    , Considerate
+    , Sympathetic
+    , Helpful
+    , GoodNatured
+    , Trusting
+    ]
+
+
+alter : (a -> a) -> Feeling -> TestResult a -> TestResult a
+alter fn feeling result =
+    case feeling of
+        Tense ->
+            { result | tense = fn result.tense }
+
+        Shaky ->
+            { result | shaky = fn result.shaky }
+
+        OnEdge ->
+            { result | onEdge = fn result.onEdge }
+
+        Panicky ->
+            { result | panicky = fn result.panicky }
+
+        Relaxed ->
+            { result | relaxed = fn result.relaxed }
+
+        Uneasy ->
+            { result | uneasy = fn result.uneasy }
+
+        Restless ->
+            { result | restless = fn result.restless }
+
+        Nervous ->
+            { result | nervous = fn result.nervous }
+
+        Anxious ->
+            { result | anxious = fn result.anxious }
+
+        Unhappy ->
+            { result | unhappy = fn result.unhappy }
+
+        SorryForThingsDone ->
+            { result | sorryForThingsDone = fn result.sorryForThingsDone }
+
+        Sad ->
+            { result | sad = fn result.sad }
+
+        Blue ->
+            { result | blue = fn result.blue }
+
+        Hopeless ->
+            { result | hopeless = fn result.hopeless }
+
+        Unworthy ->
+            { result | unworthy = fn result.unworthy }
+
+        Discouraged ->
+            { result | discouraged = fn result.discouraged }
+
+        Lonely ->
+            { result | lonely = fn result.lonely }
+
+        Miserable ->
+            { result | miserable = fn result.miserable }
+
+        Gloomy ->
+            { result | gloomy = fn result.gloomy }
+
+        Desperate ->
+            { result | desperate = fn result.desperate }
+
+        Helpless ->
+            { result | helpless = fn result.helpless }
+
+        Worthless ->
+            { result | worthless = fn result.worthless }
+
+        Terrified ->
+            { result | terrified = fn result.terrified }
+
+        Guilty ->
+            { result | guilty = fn result.guilty }
+
+        Angry ->
+            { result | angry = fn result.angry }
+
+        Peeved ->
+            { result | peeved = fn result.peeved }
+
+        Grouchy ->
+            { result | grouchy = fn result.grouchy }
+
+        Annoyed ->
+            { result | annoyed = fn result.annoyed }
+
+        Resentful ->
+            { result | resentful = fn result.resentful }
+
+        Bitter ->
+            { result | bitter = fn result.bitter }
+
+        ReadyToFight ->
+            { result | readyToFight = fn result.readyToFight }
+
+        Rebellious ->
+            { result | rebellious = fn result.rebellious }
+
+        Deceived ->
+            { result | deceived = fn result.deceived }
+
+        Furious ->
+            { result | furious = fn result.furious }
+
+        BadTempered ->
+            { result | badTempered = fn result.badTempered }
+
+        WornOut ->
+            { result | wornOut = fn result.wornOut }
+
+        Listless ->
+            { result | listless = fn result.listless }
+
+        Fatigued ->
+            { result | fatigued = fn result.fatigued }
+
+        Exhausted ->
+            { result | exhausted = fn result.exhausted }
+
+        Sluggish ->
+            { result | sluggish = fn result.sluggish }
+
+        Weary ->
+            { result | weary = fn result.weary }
+
+        Bushed ->
+            { result | bushed = fn result.bushed }
+
+        Confused ->
+            { result | confused = fn result.confused }
+
+        UnableToConcentrate ->
+            { result | unableToConcentrate = fn result.unableToConcentrate }
+
+        Muddled ->
+            { result | muddled = fn result.muddled }
+
+        Bewildered ->
+            { result | bewildered = fn result.bewildered }
+
+        Efficient ->
+            { result | efficient = fn result.efficient }
+
+        Forgetful ->
+            { result | forgetful = fn result.forgetful }
+
+        UncertainAboutThings ->
+            { result | uncertainAboutThings = fn result.uncertainAboutThings }
+
+        _ ->
+            result
+
+
 listSequenceMaybe_ : List a -> List (Maybe a) -> Maybe (List a)
 listSequenceMaybe_ built list =
     case list of
@@ -96,6 +582,11 @@ listSequenceMaybe_ built list =
 
         _ ->
             Nothing
+
+
+insert : a -> Feeling -> TestResult a -> TestResult a
+insert value =
+    alter (always value)
 
 
 listSequenceMaybe : List (Maybe a) -> Maybe (List a)
