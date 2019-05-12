@@ -1,16 +1,18 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ViewPatterns          #-}
 module Lib
     (handler) where
 
+import           Prelude
 import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyRequest (..),
                                                             cognitoIdentityId,
                                                             identity)
 import           AWS.Lambda.Events.ApiGatewayProxyResponse (ApiGatewayProxyResponse (..),
                                                             textPlain)
 import           Control.Lens                              (set)
-import           Data.HashMap.Strict                       (HashMap, fromList)
+import           Data.HashMap.Strict                       (HashMap, fromList, lookup)
 import           Data.Text                                 (Text, pack)
 import           Data.Text.Lazy                            (toStrict)
 import           Data.Time.Clock                           (UTCTime)
@@ -111,14 +113,8 @@ toPomsResultItem cognitoIentityId pr@PomsResult { dateTime, tmd, tension, depres
       , ("cognitoIdentityId", set avS (Just cognitoIentityId) attributeValue)
       ]
 
-rtTestParams :: HashMap Text Text
-rtTestParams = fromList [("testType", "rt")]
-
-pomsTestParams :: HashMap Text Text
-pomsTestParams = fromList [("testType", "poms")]
-
 handler :: MonadAWS m => Text -> ApiGatewayProxyRequest -> m ApiGatewayProxyResponse
-handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = rtTestParams } =
+handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = lookup "testType" -> Just "rt" } =
   case (decode body, cognitoIdentityId (identity requestContext)) of
     (Just rtResult, Just cogId) -> do
       _ <- send $ putRtResult tableName cogId rtResult
@@ -127,7 +123,7 @@ handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "P
       return (ApiGatewayProxyResponse unauthorized401 mempty (textPlain "Unauthorized"))
     (Nothing, _) ->
       return (ApiGatewayProxyResponse badRequest400 mempty (textPlain "Bad Request"))
-handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = pomsTestParams } =
+handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = lookup "testType" -> Just "poms"  } =
   case (decode body, cognitoIdentityId (identity requestContext)) of
     (Just pomsResult, Just cogId) -> do
       _ <- send $ putPomsResult tableName cogId pomsResult
