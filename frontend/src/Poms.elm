@@ -1,4 +1,4 @@
-module Poms exposing (Score, SubTotal, TestResult, scoreItem, scoreResult, subTotal, total)
+module Poms exposing (Score, SubTotal, TestResult, allScores, scoreItem, scoreResult, showScore, subTotal, total)
 
 
 type Score
@@ -7,6 +7,34 @@ type Score
     | Moderately
     | QuiteALot
     | Extremely
+
+
+showScore : Score -> String
+showScore score =
+    case score of
+        NotAtAll ->
+            "Not at All"
+
+        ALittle ->
+            "A Little"
+
+        Moderately ->
+            "Moderately"
+
+        QuiteALot ->
+            "Quite a Lot"
+
+        Extremely ->
+            "Extremely"
+
+
+allScores =
+    [ NotAtAll
+    , ALittle
+    , Moderately
+    , QuiteALot
+    , Extremely
+    ]
 
 
 type alias SubTotal =
