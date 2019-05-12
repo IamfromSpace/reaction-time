@@ -28,6 +28,7 @@ dependencies:
 - text
 - time
 - hal
+- http-types
 - bytestring
 - aeson
 

@@ -7,7 +7,8 @@ module Lib
 import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyRequest (..),
                                                             cognitoIdentityId,
                                                             identity)
-import           AWS.Lambda.Events.ApiGatewayProxyResponse (ApiGatewayProxyResponse (..))
+import           AWS.Lambda.Events.ApiGatewayProxyResponse (ApiGatewayProxyResponse (..),
+                                                            textPlain)
 import           Control.Lens                              (set)
 import           Data.HashMap.Strict                       (HashMap, fromList)
 import           Data.Text                                 (Text, pack)
@@ -26,6 +27,12 @@ import           Data.Aeson                                (FromJSON,
                                                             decode, parseJSON,
                                                             (.:))
 import           GHC.Generics                              (Generic)
+import           Network.HTTP.Types.Status                 (Status (..),
+                                                            badRequest400,
+                                                            methodNotAllowed405,
+                                                            notImplemented501,
+                                                            ok200,
+                                                            unauthorized401)
 
 data RtResult = RtResult
   { averageSeconds :: Float
@@ -110,26 +117,26 @@ rtTestParams = fromList [("testType", "rt")]
 pomsTestParams :: HashMap Text Text
 pomsTestParams = fromList [("testType", "poms")]
 
-handler :: MonadAWS m => Text -> ApiGatewayProxyRequest -> m (ApiGatewayProxyResponse Text)
+handler :: MonadAWS m => Text -> ApiGatewayProxyRequest -> m ApiGatewayProxyResponse
 handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = rtTestParams } =
   case (decode body, cognitoIdentityId (identity requestContext)) of
     (Just rtResult, Just cogId) -> do
       _ <- send $ putRtResult tableName cogId rtResult
-      return (ApiGatewayProxyResponse 200 mempty "Done")
+      return (ApiGatewayProxyResponse ok200 mempty (textPlain "Done"))
     (Just _, Nothing) ->
-      return (ApiGatewayProxyResponse 401 mempty "Unauthorized")
+      return (ApiGatewayProxyResponse unauthorized401 mempty (textPlain "Unauthorized"))
     (Nothing, _) ->
-      return (ApiGatewayProxyResponse 400 mempty "Bad Request")
+      return (ApiGatewayProxyResponse badRequest400 mempty (textPlain "Bad Request"))
 handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = pomsTestParams } =
   case (decode body, cognitoIdentityId (identity requestContext)) of
     (Just pomsResult, Just cogId) -> do
       _ <- send $ putPomsResult tableName cogId pomsResult
-      return (ApiGatewayProxyResponse 200 mempty "Done")
+      return (ApiGatewayProxyResponse ok200 mempty (textPlain "Done"))
     (Just _, Nothing) ->
-      return (ApiGatewayProxyResponse 401 mempty "Unauthorized")
+      return (ApiGatewayProxyResponse unauthorized401 mempty (textPlain "Unauthorized"))
     (Nothing, _) ->
-      return (ApiGatewayProxyResponse 400 mempty "Bad Request")
+      return (ApiGatewayProxyResponse badRequest400 mempty (textPlain "Bad Request"))
 handler _ ApiGatewayProxyRequest { httpMethod = "GET" } =
-  return (ApiGatewayProxyResponse 501 mempty "Not Yet Implemented")
+  return (ApiGatewayProxyResponse notImplemented501 mempty (textPlain "Not Yet Implemented"))
 handler _ _ =
-  return (ApiGatewayProxyResponse 405 mempty "Method Not Supported")
+  return (ApiGatewayProxyResponse methodNotAllowed405 mempty (textPlain "Method Not Allowed"))
