@@ -657,6 +657,30 @@ alter fn feeling result =
         UncertainAboutThings ->
             { result | uncertainAboutThings = fn result.uncertainAboutThings }
 
+        Lively ->
+            { result | lively = fn result.lively }
+
+        Active ->
+            { result | active = fn result.active }
+
+        Energetic ->
+            { result | energetic = fn result.energetic }
+
+        Cheerful ->
+            { result | cheerful = fn result.cheerful }
+
+        Alert ->
+            { result | alert = fn result.alert }
+
+        FullOfPep ->
+            { result | fullOfPep = fn result.fullOfPep }
+
+        Carefree ->
+            { result | carefree = fn result.carefree }
+
+        Vigorous ->
+            { result | vigorous = fn result.vigorous }
+
         _ ->
             result
 
