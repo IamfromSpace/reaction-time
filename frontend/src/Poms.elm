@@ -43,13 +43,13 @@ type alias SubTotal =
     , anger : Int
     , fatigue : Int
     , confusion : Int
-    , vigour : Int
+    , vigor : Int
     }
 
 
 total : SubTotal -> Int
-total { tension, depression, anger, fatigue, confusion, vigour } =
-    tension + depression + anger + fatigue + confusion - vigour
+total { tension, depression, anger, fatigue, confusion, vigor } =
+    tension + depression + anger + fatigue + confusion - vigor
 
 
 type alias TestResult a =
@@ -873,5 +873,5 @@ subTotal { tense, shaky, onEdge, panicky, relaxed, uneasy, restless, nervous, an
     , anger = angry + peeved + grouchy + annoyed + resentful + bitter + readyToFight + rebellious + deceived + furious + badTempered
     , fatigue = wornOut + listless + fatigued + exhausted + sluggish + weary + bushed
     , confusion = confused + unableToConcentrate + muddled + bewildered + (4 - efficient) + forgetful + uncertainAboutThings
-    , vigour = lively + active + energetic + cheerful + alert + fullOfPep + carefree + vigorous
+    , vigor = lively + active + energetic + cheerful + alert + fullOfPep + carefree + vigorous
     }
