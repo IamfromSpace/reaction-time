@@ -33,7 +33,7 @@ Resources:
         ApiInteraction:
           Type: Api
           Properties:
-            Path: /api/{proxy+}
+            Path: /api/tests/{testType}
             Method: post
             RestApiId: !Ref Api
             Auth:
