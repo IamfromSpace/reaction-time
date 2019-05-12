@@ -1,4 +1,4 @@
-module Poms exposing (Score, SubTotal, TestResult, allScores, scoreItem, scoreResult, showScore, subTotal, total)
+module Poms exposing (Feeling, Score, SubTotal, TestResult, allFeelings, allScores, insert, memptyMaybe, scoreItem, scoreResult, sequenceMaybe, showFeeling, showScore, subTotal, total)
 
 
 type Score
@@ -110,6 +110,68 @@ type alias TestResult a =
     , fullOfPep : a
     , carefree : a
     , vigorous : a
+    }
+
+
+memptyMaybe : TestResult (Maybe a)
+memptyMaybe =
+    { tense = Nothing
+    , shaky = Nothing
+    , onEdge = Nothing
+    , panicky = Nothing
+    , relaxed = Nothing
+    , uneasy = Nothing
+    , restless = Nothing
+    , nervous = Nothing
+    , anxious = Nothing
+    , unhappy = Nothing
+    , sorryForThingsDone = Nothing
+    , sad = Nothing
+    , blue = Nothing
+    , hopeless = Nothing
+    , unworthy = Nothing
+    , discouraged = Nothing
+    , lonely = Nothing
+    , miserable = Nothing
+    , gloomy = Nothing
+    , desperate = Nothing
+    , helpless = Nothing
+    , worthless = Nothing
+    , terrified = Nothing
+    , guilty = Nothing
+    , angry = Nothing
+    , peeved = Nothing
+    , grouchy = Nothing
+    , annoyed = Nothing
+    , resentful = Nothing
+    , bitter = Nothing
+    , readyToFight = Nothing
+    , rebellious = Nothing
+    , deceived = Nothing
+    , furious = Nothing
+    , badTempered = Nothing
+    , wornOut = Nothing
+    , listless = Nothing
+    , fatigued = Nothing
+    , exhausted = Nothing
+    , sluggish = Nothing
+    , weary = Nothing
+    , bushed = Nothing
+    , confused = Nothing
+    , unableToConcentrate = Nothing
+    , muddled = Nothing
+    , bewildered = Nothing
+    , efficient = Nothing
+    , forgetful = Nothing
+    , uncertainAboutThings = Nothing
+    , lively = Nothing
+    , active = Nothing
+    , energetic = Nothing
+    , cheerful = Nothing
+    , alert = Nothing
+    , fullOfPep = Nothing
+    , carefree = Nothing
+    , vigorous = Nothing
     }
 
 

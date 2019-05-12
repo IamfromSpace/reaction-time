@@ -13,6 +13,7 @@
             "elm/json": "1.1.2",
             "elm/random": "1.0.0",
             "elm/time": "1.0.0",
+            "elm-community/random-extra": "3.1.0",
             "rtfeldman/elm-iso8601-date-strings": "1.1.2"
         },
         "indirect": {
@@ -20,7 +21,8 @@
             "elm/file": "1.0.4",
             "elm/parser": "1.1.0",
             "elm/url": "1.0.0",
-            "elm/virtual-dom": "1.0.2"
+            "elm/virtual-dom": "1.0.2",
+            "owanturist/elm-union-find": "1.0.0"
         }
     },
     "test-dependencies": {
