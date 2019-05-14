@@ -39,17 +39,17 @@ type Msg
     | SubmitResult (Maybe PomsError)
 
 
-update : PomsReporter -> Msg -> Model -> ( Model, Cmd Msg )
-update reportResult msg model =
-    case ( msg, model ) of
-        ( Start, NotStarted ) ->
+update : Maybe PomsReporter -> Msg -> Model -> ( Model, Cmd Msg )
+update mReportResult msg model =
+    case ( msg, model, mReportResult ) of
+        ( Start, NotStarted, _ ) ->
             let
                 ( m, cmds ) =
                     PomsTest.init
             in
             ( Running m, Cmd.map PomsTestMsg cmds )
 
-        ( PomsTestMsg msg_, Running model_ ) ->
+        ( PomsTestMsg msg_, Running model_, _ ) ->
             let
                 ( m, cmds ) =
                     PomsTest.update msg_ model_
@@ -69,19 +69,19 @@ update reportResult msg model =
             else
                 continue
 
-        ( Now posix, DoneAwaitingTime r ) ->
+        ( Now posix, DoneAwaitingTime r, _ ) ->
             ( Done r posix NotSubmitted, Cmd.none )
 
-        ( Submit, Done r t NotSubmitted ) ->
+        ( Submit, Done r t NotSubmitted, Just reportResult ) ->
             doSubmit reportResult r t
 
-        ( Submit, Done r t (SubmitError MaybeRetry) ) ->
+        ( Submit, Done r t (SubmitError MaybeRetry), Just reportResult ) ->
             doSubmit reportResult r t
 
-        ( Submit, Done r t (SubmitError RetryLater) ) ->
+        ( Submit, Done r t (SubmitError RetryLater), Just reportResult ) ->
             doSubmit reportResult r t
 
-        ( SubmitResult x, Done r t Submitting ) ->
+        ( SubmitResult x, Done r t Submitting, _ ) ->
             case x of
                 Nothing ->
                     ( Done r t Submitted, Cmd.none )
@@ -108,8 +108,8 @@ doSubmit reportResult r t =
     ( Done r t Submitting, Cmd.map SubmitResult (reportResult v) )
 
 
-view : Model -> Html Msg
-view model =
+view : Bool -> Model -> Html Msg
+view loggedIn model =
     case model of
         NotStarted ->
             button [ onClick Start ] [ text "Start" ]
@@ -118,14 +118,14 @@ view model =
             Html.map PomsTestMsg <| PomsTest.view model_
 
         DoneAwaitingTime r ->
-            doneView r Nothing
+            doneView loggedIn r Nothing
 
         Done r _ submitState ->
-            doneView r (Just submitState)
+            doneView loggedIn r (Just submitState)
 
 
-doneView : TestResult Score -> Maybe SubmitState -> Html Msg
-doneView r mSubmitState =
+doneView : Bool -> TestResult Score -> Maybe SubmitState -> Html Msg
+doneView loggedIn r mSubmitState =
     let
         sub =
             subTotal (scoreResult r)
@@ -141,7 +141,12 @@ doneView r mSubmitState =
         , div [] [ text ("Fatigue: " ++ String.fromInt sub.fatigue) ]
         , div [] [ text ("Confusion: " ++ String.fromInt sub.confusion) ]
         , div [] [ text ("Vigor: " ++ String.fromInt sub.vigor) ]
-        , submitView mSubmitState
+        , submitView <|
+            if loggedIn then
+                mSubmitState
+
+            else
+                Nothing
         ]
 
 

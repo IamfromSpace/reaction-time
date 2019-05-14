@@ -9,7 +9,7 @@ main : Program () Model Msg
 main =
     element
         { init = \_ -> init
-        , view = view
-        , update = update successReporter
+        , view = view True
+        , update = update (Just successReporter)
         , subscriptions = \_ -> Sub.none
         }
