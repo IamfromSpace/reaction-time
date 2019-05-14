@@ -5,7 +5,7 @@
 module Lib
     (handler) where
 
-import           Prelude
+import           Prelude                                   hiding (lookup)
 import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyRequest (..),
                                                             cognitoIdentityId,
                                                             identity)
