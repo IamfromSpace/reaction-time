@@ -19,16 +19,26 @@ mkLoginUpdateConfig clientId =
 
 main : Program () Model Msg
 main =
+    let
+        rtEndpoint =
+            "http://example.com/api/tests/rt"
+
+        pomsEndpoint =
+            "http://example.com/api/tests/poms"
+
+        cognitoClientId =
+            "XXX"
+    in
     element
         { init = \_ -> ( initialModel, Cmd.none )
         , view = view
         , update =
             update <|
                 { mkRtTestUpdate =
-                    RtTest.update 80 << Maybe.map (RtServerClient.reportResult "http://example.com/tests/rt")
+                    RtTest.update 80 << Maybe.map (RtServerClient.reportResult rtEndpoint)
                 , mkPomsTestUpdate =
-                    PomsTestAndResults.update << Maybe.map (PomsServerClient.reportResult "http://example.com/tests/poms")
-                , loginUpdate = Login.update (mkLoginUpdateConfig "XXX")
+                    PomsTestAndResults.update << Maybe.map (PomsServerClient.reportResult pomsEndpoint)
+                , loginUpdate = Login.update (mkLoginUpdateConfig cognitoClientId)
                 }
         , subscriptions = sub
         }
