@@ -6,13 +6,13 @@ Resources:
       AttributeDefinitions:
         - AttributeName: cognitoIdentityId
           AttributeType: S
-        - AttributeName: dateTime
+        - AttributeName: LI
           AttributeType: S
       BillingMode: PAY_PER_REQUEST
       KeySchema:
         - AttributeName: cognitoIdentityId
           KeyType: HASH
-        - AttributeName: dateTime
+        - AttributeName: LI
           KeyType: RANGE
   DataPlanePolicy:
     Type: AWS::IAM::ManagedPolicy
