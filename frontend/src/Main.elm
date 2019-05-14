@@ -4,7 +4,9 @@ import App exposing (Model, Msg, initialModel, sub, update, view)
 import Browser exposing (element)
 import CognitoClient exposing (mkAnswerNewPasswordChallenge, mkLogin)
 import Login
-import RtServerClient exposing (reportResult)
+import PomsServerClient
+import PomsTestAndResults
+import RtServerClient
 import RtTest
 
 
@@ -23,7 +25,9 @@ main =
         , update =
             update <|
                 { mkRtTestUpdate =
-                    RtTest.update 80 << Maybe.map (reportResult "http://example.com")
+                    RtTest.update 80 << Maybe.map (RtServerClient.reportResult "http://example.com/tests/rt")
+                , mkPomsTestUpdate =
+                    PomsTestAndResults.update << Maybe.map (PomsServerClient.reportResult "http://example.com/tests/poms")
                 , loginUpdate = Login.update (mkLoginUpdateConfig "XXX")
                 }
         , subscriptions = sub

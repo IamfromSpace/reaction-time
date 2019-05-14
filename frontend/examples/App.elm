@@ -4,7 +4,9 @@ import App exposing (Model, Msg, initialModel, sub, update, view)
 import Browser exposing (element)
 import CognitoClientMocks exposing (alwaysRequireChangePasswordWithSession, alwaysSucceedChangePasswordWithToken)
 import Login
-import RtServerClient exposing (successReporter)
+import PomsServerClient
+import PomsTestAndResults
+import RtServerClient
 import RtTest
 
 
@@ -16,7 +18,9 @@ main =
         , update =
             update <|
                 { mkRtTestUpdate =
-                    RtTest.update 4 << Maybe.map (always successReporter)
+                    RtTest.update 4 << Maybe.map (always RtServerClient.successReporter)
+                , mkPomsTestUpdate =
+                    PomsTestAndResults.update << Maybe.map (always PomsServerClient.successReporter)
                 , loginUpdate =
                     Login.update
                         { login = alwaysRequireChangePasswordWithSession ""

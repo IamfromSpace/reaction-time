@@ -1,4 +1,4 @@
-module PomsTestAndResults exposing (Model, Msg, init, update, view)
+module PomsTestAndResults exposing (Model, Msg, Update, initialModel, isRunning, update, view)
 
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (disabled)
@@ -24,11 +24,22 @@ type SubmitState
     | SubmitError PomsError
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( NotStarted
-    , Cmd.none
-    )
+isRunning : Model -> Bool
+isRunning m =
+    case m of
+        Running _ ->
+            True
+
+        DoneAwaitingTime _ ->
+            True
+
+        _ ->
+            False
+
+
+initialModel : Model
+initialModel =
+    NotStarted
 
 
 type Msg
@@ -39,7 +50,11 @@ type Msg
     | SubmitResult (Maybe PomsError)
 
 
-update : Maybe PomsReporter -> Msg -> Model -> ( Model, Cmd Msg )
+type alias Update =
+    Msg -> Model -> ( Model, Cmd Msg )
+
+
+update : Maybe PomsReporter -> Update
 update mReportResult msg model =
     case ( msg, model, mReportResult ) of
         ( Start, NotStarted, _ ) ->

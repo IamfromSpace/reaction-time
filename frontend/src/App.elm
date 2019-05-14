@@ -7,6 +7,7 @@ import Login
 import PetAndResults
 import Platform.Cmd exposing (Cmd)
 import Platform.Sub exposing (Sub)
+import PomsTestAndResults
 import RtServerClient exposing (RtReporter, reportResult)
 import RtTest
 
@@ -14,12 +15,14 @@ import RtTest
 type PossibleTest
     = RtTest
     | Pet
+    | Poms
 
 
 initialModel : Model
 initialModel =
     { rtTestState = RtTest.initialModel
     , petState = PetAndResults.initialModel
+    , pomsTestState = PomsTestAndResults.initialModel
     , currentTest = RtTest
     , loginState = NotLoggedIn
     }
@@ -28,19 +31,23 @@ initialModel =
 type alias Model =
     { rtTestState : RtTest.Model
     , petState : PetAndResults.Model
+    , pomsTestState : PomsTestAndResults.Model
     , currentTest : PossibleTest
     , loginState : LoginState
     }
 
 
 isRunning : Model -> Bool
-isRunning { currentTest, petState, rtTestState } =
+isRunning { currentTest, petState, rtTestState, pomsTestState } =
     case currentTest of
         RtTest ->
             RtTest.isRunning rtTestState
 
         Pet ->
             PetAndResults.isRunning petState
+
+        Poms ->
+            PomsTestAndResults.isRunning pomsTestState
 
 
 type LoginState
@@ -52,6 +59,7 @@ type LoginState
 type Msg
     = RtTestMsg RtTest.Msg
     | PetTestMsg PetAndResults.Msg
+    | PomsTestMsg PomsTestAndResults.Msg
     | SelectTest PossibleTest
     | LoginMsg Login.Msg
     | StartLogin
@@ -59,12 +67,13 @@ type Msg
 
 type alias Config =
     { mkRtTestUpdate : Maybe String -> RtTest.Update
+    , mkPomsTestUpdate : Maybe String -> PomsTestAndResults.Update
     , loginUpdate : Login.LoginUpdate
     }
 
 
 update : Config -> Msg -> Model -> ( Model, Cmd Msg )
-update { mkRtTestUpdate, loginUpdate } msg ({ rtTestState, petState, loginState } as s) =
+update { mkRtTestUpdate, mkPomsTestUpdate, loginUpdate } msg ({ rtTestState, petState, loginState, pomsTestState } as s) =
     case ( msg, loginState ) of
         ( StartLogin, NotLoggedIn ) ->
             ( { s | loginState = LoggingIn Login.initModel }, Cmd.none )
@@ -103,6 +112,21 @@ update { mkRtTestUpdate, loginUpdate } msg ({ rtTestState, petState, loginState 
             in
             ( { s | rtTestState = next }, Cmd.map RtTestMsg cmds )
 
+        ( PomsTestMsg testMsg, _ ) ->
+            let
+                mToken =
+                    case loginState of
+                        LoggedIn token ->
+                            Just token
+
+                        _ ->
+                            Nothing
+
+                ( next, cmds ) =
+                    mkPomsTestUpdate mToken testMsg pomsTestState
+            in
+            ( { s | pomsTestState = next }, Cmd.map PomsTestMsg cmds )
+
         ( SelectTest test, _ ) ->
             if isRunning s then
                 ( s, Cmd.none )
@@ -115,7 +139,7 @@ update { mkRtTestUpdate, loginUpdate } msg ({ rtTestState, petState, loginState 
 
 
 view : Model -> Html Msg
-view ({ rtTestState, petState, loginState, currentTest } as s) =
+view ({ rtTestState, petState, pomsTestState, loginState, currentTest } as s) =
     let
         ifRunning =
             disabled (isRunning s)
@@ -123,6 +147,7 @@ view ({ rtTestState, petState, loginState, currentTest } as s) =
         selectorButtons =
             [ button [ onClick (SelectTest RtTest), ifRunning ] [ text "Reaction Time" ]
             , button [ onClick (SelectTest Pet), ifRunning ] [ text "PET" ]
+            , button [ onClick (SelectTest Poms), ifRunning ] [ text "POMS" ]
             ]
 
         inner loggedIn =
@@ -132,6 +157,9 @@ view ({ rtTestState, petState, loginState, currentTest } as s) =
 
                 Pet ->
                     Html.map PetTestMsg (PetAndResults.view petState)
+
+                Poms ->
+                    Html.map PomsTestMsg (PomsTestAndResults.view loggedIn pomsTestState)
     in
     div
         []
