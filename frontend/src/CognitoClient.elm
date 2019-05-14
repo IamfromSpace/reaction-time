@@ -5,6 +5,13 @@ import Json.Decode as D exposing (Decoder)
 import Json.Encode exposing (Value, encode, object, string)
 
 
+
+-- This module is based on the reference js implementation:
+-- https://github.com/aws-amplify/amplify-js/blob/master/packages/amazon-cognito-identity-js/src/CognitoUser.js
+-- Examples of it in use:
+-- https://docs.aws.amazon.com/cognito/latest/developerguide/using-amazon-cognito-user-identity-pools-javascript-examples.html
+
+
 type alias LoginInfo =
     { username : String
     , password : String
