@@ -10,10 +10,10 @@ import RtServerClient
 import RtTest
 
 
-mkLoginUpdateConfig : String -> Login.Config
-mkLoginUpdateConfig clientId =
-    { login = mkLogin clientId
-    , answerNewPasswordChallenge = mkAnswerNewPasswordChallenge clientId
+mkLoginUpdateConfig : String -> String -> Login.Config
+mkLoginUpdateConfig region clientId =
+    { login = mkLogin region clientId
+    , answerNewPasswordChallenge = mkAnswerNewPasswordChallenge region clientId
     }
 
 
@@ -28,6 +28,9 @@ main =
 
         cognitoClientId =
             "XXX"
+
+        cognitoRegion =
+            "us-west-2"
     in
     element
         { init = \_ -> ( initialModel, Cmd.none )
@@ -38,7 +41,7 @@ main =
                     RtTest.update 80 << Maybe.map (RtServerClient.reportResult rtEndpoint)
                 , mkPomsTestUpdate =
                     PomsTestAndResults.update << Maybe.map (PomsServerClient.reportResult pomsEndpoint)
-                , loginUpdate = Login.update (mkLoginUpdateConfig cognitoClientId)
+                , loginUpdate = Login.update (mkLoginUpdateConfig cognitoRegion cognitoClientId)
                 }
         , subscriptions = sub
         }

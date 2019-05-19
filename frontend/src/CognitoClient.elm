@@ -71,13 +71,13 @@ type alias Login =
     String -> String -> Cmd (Result Error LoginResult)
 
 
-mkLogin : String -> Login
-mkLogin clientId username password =
+mkLogin : String -> String -> Login
+mkLogin region clientId username password =
     request
         { method = "POST"
         , headers =
             [ header "X-Amz-Target" "AWSCognitoIdentityProviderService.InitiateAuth" ]
-        , url = "https://cognito-idp.us-east-1.amazonaws.com"
+        , url = "https://cognito-idp." ++ region ++ ".amazonaws.com"
         , body =
             stringBody "application/x-amz-json-1.1" <|
                 encode 0 <|
@@ -96,13 +96,13 @@ type alias AnswerNewPasswordChallenge =
     String -> String -> String -> Cmd (Result Error String)
 
 
-mkAnswerNewPasswordChallenge : String -> AnswerNewPasswordChallenge
-mkAnswerNewPasswordChallenge clientId session username password =
+mkAnswerNewPasswordChallenge : String -> String -> AnswerNewPasswordChallenge
+mkAnswerNewPasswordChallenge region clientId session username password =
     request
         { method = "POST"
         , headers =
             [ header "X-Amz-Target" "AWSCognitoIdentityProviderService.RespondToAuthChallenge" ]
-        , url = "https://cognito-idp.us-east-1.amazonaws.com"
+        , url = "https://cognito-idp." ++ region ++ ".amazonaws.com"
         , body =
             stringBody "application/x-amz-json-1.1" <|
                 encode 0 <|
