@@ -6,9 +6,7 @@ module Lib
     (handler) where
 
 import           Prelude                                   hiding (lookup)
-import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyRequest (..),
-                                                            cognitoIdentityId,
-                                                            identity)
+import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyRequest (..), authorizer)
 import           AWS.Lambda.Events.ApiGatewayProxyResponse (ApiGatewayProxyResponse (..),
                                                             textPlain)
 import           Control.Lens                              (set)
@@ -76,12 +74,18 @@ instance FromJSON PomsResult where
     (read <$> v .: "dateTime")
   parseJSON _ = mzero
 
+data UserId = UserId Text
+
+instance FromJSON UserId where
+  parseJSON (Object v) =
+    UserId <$> (v .: "claims" >>= (\(Object v2) -> v2 .: "sub"))
+
 putRtResult :: Text -> Text -> RtResult -> PutItem
-putRtResult tableName cognitoIdentityId rtResult =
-  set piItem (toRtResultItem cognitoIdentityId rtResult) (putItem tableName)
+putRtResult tableName userId rtResult =
+  set piItem (toRtResultItem userId rtResult) (putItem tableName)
 
 toRtResultItem :: Text -> RtResult -> HashMap Text AttributeValue
-toRtResultItem cognitoIentityId RtResult { averageSeconds, successCount, testCount, dateTime } =
+toRtResultItem userId RtResult { averageSeconds, successCount, testCount, dateTime } =
     fromList
       [ ("averageReactionTimeSeconds", set avN (Just $ pack $ show averageSeconds) attributeValue)
       , ("successCount", set avN (Just $ pack $ show successCount) attributeValue)
@@ -90,15 +94,15 @@ toRtResultItem cognitoIentityId RtResult { averageSeconds, successCount, testCou
       , ("testType", set avS (Just "rt") attributeValue)
       , ("LI", set avS (Just (pack ("rt#" ++ show dateTime))) attributeValue)
       , ("LSI", set avS (Just (pack (show dateTime ++ "#rt"))) attributeValue)
-      , ("cognitoIdentityId", set avS (Just cognitoIentityId) attributeValue)
+      , ("userId", set avS (Just userId) attributeValue)
       ]
 
 putPomsResult :: Text -> Text -> PomsResult -> PutItem
-putPomsResult tableName cognitoIdentityId pomsResult =
-  set piItem (toPomsResultItem cognitoIdentityId pomsResult) (putItem tableName)
+putPomsResult tableName userId pomsResult =
+  set piItem (toPomsResultItem userId pomsResult) (putItem tableName)
 
 toPomsResultItem :: Text -> PomsResult -> HashMap Text AttributeValue
-toPomsResultItem cognitoIentityId pr@PomsResult { dateTime, tmd, tension, depression, anger, fatigue, confusion, vigor } =
+toPomsResultItem userId pr@PomsResult { dateTime, tmd, tension, depression, anger, fatigue, confusion, vigor } =
     fromList
       [ ("tmd", set avN (Just $ pack $ show tmd) attributeValue)
       , ("tension", set avN (Just $ pack $ show tension) attributeValue)
@@ -110,23 +114,23 @@ toPomsResultItem cognitoIentityId pr@PomsResult { dateTime, tmd, tension, depres
       , ("LI", set avS (Just (pack ("poms#" ++ show dateTime))) attributeValue)
       , ("LSI", set avS (Just (pack (show dateTime ++ "#poms"))) attributeValue)
       , ("dateTimeUTC", set avS (Just $ pack $ show dateTime) attributeValue)
-      , ("cognitoIdentityId", set avS (Just cognitoIentityId) attributeValue)
+      , ("userId", set avS (Just userId) attributeValue)
       ]
 
-handler :: MonadAWS m => Text -> ApiGatewayProxyRequest -> m ApiGatewayProxyResponse
+handler :: MonadAWS m => Text -> ApiGatewayProxyRequest UserId -> m ApiGatewayProxyResponse
 handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = lookup "testType" -> Just "rt" } =
-  case (decode body, cognitoIdentityId (identity requestContext)) of
-    (Just rtResult, Just cogId) -> do
-      _ <- send $ putRtResult tableName cogId rtResult
+  case (decode body, authorizer requestContext) of
+    (Just rtResult, Just (UserId userId)) -> do
+      _ <- send $ putRtResult tableName userId rtResult
       return (ApiGatewayProxyResponse ok200 mempty (textPlain "Done"))
     (Just _, Nothing) ->
       return (ApiGatewayProxyResponse unauthorized401 mempty (textPlain "Unauthorized"))
     (Nothing, _) ->
       return (ApiGatewayProxyResponse badRequest400 mempty (textPlain "Bad Request"))
 handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = lookup "testType" -> Just "poms"  } =
-  case (decode body, cognitoIdentityId (identity requestContext)) of
-    (Just pomsResult, Just cogId) -> do
-      _ <- send $ putPomsResult tableName cogId pomsResult
+  case (decode body, authorizer requestContext) of
+    (Just pomsResult, Just (UserId userId)) -> do
+      _ <- send $ putPomsResult tableName userId pomsResult
       return (ApiGatewayProxyResponse ok200 mempty (textPlain "Done"))
     (Just _, Nothing) ->
       return (ApiGatewayProxyResponse unauthorized401 mempty (textPlain "Unauthorized"))
