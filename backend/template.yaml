@@ -46,7 +46,7 @@ Resources:
         - AWSLambdaBasicExecutionRole
         - Fn::ImportValue: !Sub "${TableStack}-TableDataPlanePolicy"
       MemorySize: 128
-      Timeout: 3
+      Timeout: 7
   Api:
     Type: AWS::Serverless::Api
     Properties:
