@@ -28,3 +28,8 @@ Outputs:
     Value: !Ref CustomDomain
     Export:
       Name: !Sub "${AWS::StackName}-CustomDomain"
+  RegionalDomainName:
+    Description: This is should be used as the target of the DNS record for the specified domain
+    Value: !GetAtt CustomDomain.RegionalDomainName
+    Export:
+      Name: !Sub "${AWS::StackName}-RegionalDomainName"
