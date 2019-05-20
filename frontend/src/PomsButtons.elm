@@ -7,8 +7,8 @@ import Json.Decode exposing (succeed)
 import Poms exposing (Score, allScores, showScore)
 
 
-box : Score -> Html Score
-box score =
+box : String -> Score -> Html Score
+box color score =
     Html.div
         [ style "height" "16vw"
         , style "width" "16vw"
@@ -16,14 +16,37 @@ box score =
         , style "font-size" "3vw"
         , style "line-height" "16vw"
         , style "border" "1px solid black"
+        , style "background-color" color
         , preventDefaultOn "touchstart" (succeed ( score, True ))
         , onClick score
         ]
         [ Html.text (showScore score) ]
 
 
-boxes : Html Score
-boxes =
+justMatch : Maybe a -> a -> Bool
+justMatch ma b =
+    case ma of
+        Just a ->
+            a == b
+
+        Nothing ->
+            False
+
+
+boxes : Maybe Score -> Html Score
+boxes selected =
     Html.div
         [ style "flex-direction" "row", style "display" "flex" ]
-        (List.map box allScores)
+        (List.map
+            (\score ->
+                box
+                    (if justMatch selected score then
+                        "#23ba2d"
+
+                     else
+                        "#FFF"
+                    )
+                    score
+            )
+            allScores
+        )
