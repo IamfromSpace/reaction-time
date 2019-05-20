@@ -11,7 +11,13 @@ import Platform.Cmd exposing (Cmd)
 
 initModel : Model
 initModel =
-    { email = "", password = "", session = Nothing, loading = False, lastError = Nothing }
+    { email = ""
+    , password = ""
+    , passwordConfirmation = ""
+    , session = Nothing
+    , loading = False
+    , lastError = Nothing
+    }
 
 
 init : ( Model, Cmd Msg )
@@ -20,12 +26,19 @@ init =
 
 
 type alias Model =
-    { email : String, password : String, session : Maybe String, loading : Bool, lastError : Maybe Error }
+    { email : String
+    , password : String
+    , passwordConfirmation : String
+    , session : Maybe String
+    , loading : Bool
+    , lastError : Maybe Error
+    }
 
 
 type Msg
     = UpdateEmail String
     | UpdatePassword String
+    | UpdatePasswordConfirmation String
     | RequestToken
     | RequestNewPassword String
     | ReceiveError Error
@@ -66,14 +79,29 @@ type alias Config =
     }
 
 
+validateNewPassword : String -> String -> Maybe String
+validateNewPassword password passwordConfirmation =
+    if String.length password < 12 then
+        Just "Passwords must be 12 chars or more"
+
+    else if password /= passwordConfirmation then
+        Just "Passwords must match"
+
+    else
+        Nothing
+
+
 update : Config -> LoginUpdate
-update { login, answerNewPasswordChallenge } msg ({ email, password, loading, lastError } as s) =
+update { login, answerNewPasswordChallenge } msg ({ email, password, passwordConfirmation, loading, lastError } as s) =
     case ( msg, loading ) of
         ( UpdateEmail new, False ) ->
             ( ( { s | email = new }, Cmd.none ), Nothing )
 
         ( UpdatePassword new, False ) ->
             ( ( { s | password = new }, Cmd.none ), Nothing )
+
+        ( UpdatePasswordConfirmation new, False ) ->
+            ( ( { s | passwordConfirmation = new }, Cmd.none ), Nothing )
 
         ( RequestToken, False ) ->
             ( ( { s | loading = True, lastError = Nothing }
@@ -83,15 +111,20 @@ update { login, answerNewPasswordChallenge } msg ({ email, password, loading, la
             )
 
         ( RequestNewPassword session, False ) ->
-            ( ( { s | loading = True, lastError = Nothing }
-              , Cmd.map challengeResponseToMsg <| answerNewPasswordChallenge session email password
-              )
-            , Nothing
-            )
+            if validateNewPassword password passwordConfirmation == Nothing then
+                ( ( { s | loading = True, lastError = Nothing }
+                  , Cmd.map challengeResponseToMsg <| answerNewPasswordChallenge session email password
+                  )
+                , Nothing
+                )
+
+            else
+                ( ( s, Cmd.none ), Nothing )
 
         ( ReceiveToken token, True ) ->
             ( ( { email = ""
                 , password = ""
+                , passwordConfirmation = ""
                 , loading = False
                 , lastError = Nothing
                 , session = Nothing
@@ -102,7 +135,13 @@ update { login, answerNewPasswordChallenge } msg ({ email, password, loading, la
             )
 
         ( ReceiveChallenge session, True ) ->
-            ( ( { s | password = "", loading = False, lastError = Nothing, session = Just session }
+            ( ( { s
+                    | password = ""
+                    , passwordConfirmation = ""
+                    , loading = False
+                    , lastError = Nothing
+                    , session = Just session
+                }
               , Cmd.none
               )
             , Nothing
@@ -116,7 +155,7 @@ update { login, answerNewPasswordChallenge } msg ({ email, password, loading, la
 
 
 view : Model -> Html Msg
-view { email, password, loading, lastError, session } =
+view { email, password, passwordConfirmation, loading, lastError, session } =
     form
         [ onSubmit <|
             case session of
@@ -126,18 +165,44 @@ view { email, password, loading, lastError, session } =
                 Just s ->
                     RequestNewPassword s
         ]
-        [ label [] [ text "Email" ]
-        , input [ onInput UpdateEmail, type_ "email", value email, disabled loading ] []
-        , label [] [ text "Password" ]
-        , input [ onInput UpdatePassword, type_ "password", value password, disabled loading ] []
-        , button [ disabled loading ]
+        [ div []
+            [ label [] [ text "Email" ]
+            , input [ onInput UpdateEmail, type_ "email", value email, disabled loading ] []
+            ]
+        , div []
+            [ label [] [ text "Password" ]
+            , input [ onInput UpdatePassword, type_ "password", value password, disabled loading ] []
+            ]
+        , div []
+            (case session of
+                Nothing ->
+                    []
+
+                Just _ ->
+                    [ label [] [ text "Confirm Password" ]
+                    , input [ onInput UpdatePasswordConfirmation, type_ "password", value passwordConfirmation, disabled loading ] []
+                    ]
+            )
+        , let
+            passwordValidation =
+                validateNewPassword password passwordConfirmation
+
+            isValid =
+                passwordValidation == Nothing
+          in
+          button [ disabled (loading || session /= Nothing && not isValid) ]
             [ text <|
                 case session of
                     Nothing ->
                         "Login"
 
                     Just _ ->
-                        "Update Password"
+                        case passwordValidation of
+                            Just msg ->
+                                msg
+
+                            Nothing ->
+                                "Update Password"
             ]
         , text <|
             case lastError of
