@@ -12,8 +12,9 @@
 1. Deploy the backend/template.yaml stack as `training-${env}-api`, using the version of the zip in S3 and the names of all previous stacks.
 1. Deploy the frontend/cloudformation/bucket.yaml stack as `training-${env}-browser-app-code`
 1. Inject the clientId (exported by the user-pool stack) and the custom domain into frontend/src/Main.elm
-1. Build the browser app via `node_modules/elm/bin/elm make src/Main.elm --output index.js`
-1. Create an `index.html` file based on the `template.html` file with the generated js inside the appropriate script tag.
+1. Build the browser app via `node_modules/elm/bin/elm make src/Main.elm --optimize --output index.js`
+1. Shrink the file with `uglifyjs index.js --compress "pure_funcs=[F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9],pure_getters,keep_fargs=false,unsafe_comps,unsafe" | uglifyjs --mangle --output=index.min.js`
+1. Create an `index.html` file based on the `template.html` file with the `index.min.js` inside the appropriate script tag.
 1. Push the resulting `index.html` frontend build into the newly created s3 stack
 1. Deploy the `frontend/cloudformation/api_s3_proxy.yaml` as `training-${env}-api-s3-proxy` using the previously created stacks as parameters.
 1. Within the console, navidate to the Api Gateway name `training-${env}-api` and re-deploy the `default` stage.
