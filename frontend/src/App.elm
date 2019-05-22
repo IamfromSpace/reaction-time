@@ -1,5 +1,6 @@
-module App exposing (Model, Msg, initialModel, sub, update, view)
+module App exposing (Config, Model, Msg, initialModel, sub, update, view)
 
+import CognitoClient
 import Html exposing (Html, button, div, text)
 import Html.Attributes exposing (disabled)
 import Html.Events exposing (onClick)
@@ -53,7 +54,7 @@ isRunning { currentTest, petState, rtTestState, pomsTestState } =
 type LoginState
     = NotLoggedIn
     | LoggingIn Login.Model
-    | LoggedIn String
+    | LoggedIn CognitoClient.TokenSet
 
 
 type Msg
@@ -69,14 +70,19 @@ type alias Config =
     { mkRtTestUpdate : Maybe String -> RtTest.Update
     , mkPomsTestUpdate : Maybe String -> PomsTestAndResults.Update
     , loginUpdate : Login.LoginUpdate
+    , loginInit : ( Login.Model, Cmd Login.Msg )
     }
 
 
 update : Config -> Msg -> Model -> ( Model, Cmd Msg )
-update { mkRtTestUpdate, mkPomsTestUpdate, loginUpdate } msg ({ rtTestState, petState, loginState, pomsTestState } as s) =
+update { loginInit, mkRtTestUpdate, mkPomsTestUpdate, loginUpdate } msg ({ rtTestState, petState, loginState, pomsTestState } as s) =
     case ( msg, loginState ) of
         ( StartLogin, NotLoggedIn ) ->
-            ( { s | loginState = LoggingIn Login.initModel }, Cmd.none )
+            let
+                ( m, cmds ) =
+                    loginInit
+            in
+            ( { s | loginState = LoggingIn m }, Cmd.map LoginMsg cmds )
 
         ( LoginMsg m, LoggingIn x ) ->
             let
@@ -87,8 +93,8 @@ update { mkRtTestUpdate, mkPomsTestUpdate, loginUpdate } msg ({ rtTestState, pet
                 Nothing ->
                     ( { s | loginState = LoggingIn next }, Cmd.map LoginMsg cmds )
 
-                Just token ->
-                    ( { s | loginState = LoggedIn token }, Cmd.none )
+                Just tokens ->
+                    ( { s | loginState = LoggedIn tokens }, Cmd.map LoginMsg cmds )
 
         ( PetTestMsg testMsg, _ ) ->
             let
@@ -99,31 +105,31 @@ update { mkRtTestUpdate, mkPomsTestUpdate, loginUpdate } msg ({ rtTestState, pet
 
         ( RtTestMsg testMsg, _ ) ->
             let
-                mToken =
+                mIdToken =
                     case loginState of
-                        LoggedIn token ->
-                            Just token
+                        LoggedIn tokens ->
+                            Just tokens.id
 
                         _ ->
                             Nothing
 
                 ( next, cmds ) =
-                    mkRtTestUpdate mToken testMsg rtTestState
+                    mkRtTestUpdate mIdToken testMsg rtTestState
             in
             ( { s | rtTestState = next }, Cmd.map RtTestMsg cmds )
 
         ( PomsTestMsg testMsg, _ ) ->
             let
-                mToken =
+                mIdToken =
                     case loginState of
-                        LoggedIn token ->
-                            Just token
+                        LoggedIn tokens ->
+                            Just tokens.id
 
                         _ ->
                             Nothing
 
                 ( next, cmds ) =
-                    mkPomsTestUpdate mToken testMsg pomsTestState
+                    mkPomsTestUpdate mIdToken testMsg pomsTestState
             in
             ( { s | pomsTestState = next }, Cmd.map PomsTestMsg cmds )
 

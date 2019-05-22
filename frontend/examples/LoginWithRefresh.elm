@@ -30,7 +30,7 @@ config =
 main : Program () Model Msg
 main =
     element
-        { init = \_ -> mkInit config Nothing
+        { init = \_ -> mkInit config (Just "refresh")
         , view = view
         , update =
             \msg model ->

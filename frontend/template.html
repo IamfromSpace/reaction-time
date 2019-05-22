@@ -1,0 +1,25 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Main</title>
+</head>
+
+<body>
+<div id="elm-app"></div>
+<script>
+${APP CODE HERE}
+</script>
+<script>
+var localStorageKey = 'refreshToken';
+var refreshToken = localStorage.getItem(localStorageKey);
+var app = Elm.Main.init({
+  node: document.getElementById("elm-app"),
+  flags: refreshToken
+});
+app.ports.cacheRefreshToken.subscribe(function(token) {
+  localStorage.setItem(localStorageKey, token);
+})
+</script>
+</body>
+</html>

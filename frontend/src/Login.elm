@@ -1,6 +1,6 @@
-module Login exposing (Config, LoginUpdate, Model, Msg, init, initModel, update, view)
+module Login exposing (Config, LoginUpdate, Model, Msg, mkInit, update, view)
 
-import CognitoClient exposing (AnswerNewPasswordChallenge, Login, LoginResult(..))
+import CognitoClient exposing (AnswerNewPasswordChallenge, Login, LoginResult(..), RefreshSession, TokenSet)
 import Html exposing (Html, button, div, form, input, label, text)
 import Html.Attributes exposing (disabled, style, type_, value)
 import Html.Events exposing (onInput, onSubmit)
@@ -9,20 +9,22 @@ import Json.Decode exposing (field, string, succeed)
 import Platform.Cmd exposing (Cmd)
 
 
-initModel : Model
-initModel =
-    { email = ""
-    , password = ""
-    , passwordConfirmation = ""
-    , session = Nothing
-    , loading = False
-    , lastError = Nothing
-    }
+mkInit : Config -> Maybe String -> ( Model, Cmd Msg )
+mkInit { refreshSession } mRefreshToken =
+    ( { email = ""
+      , password = ""
+      , passwordConfirmation = ""
+      , session = Nothing
+      , loading = mRefreshToken /= Nothing
+      , lastError = Nothing
+      }
+    , case mRefreshToken of
+        Just token ->
+            Cmd.map tokensOrErrorToMsg <| refreshSession token
 
-
-init : ( Model, Cmd Msg )
-init =
-    ( initModel, Cmd.none )
+        Nothing ->
+            Cmd.none
+    )
 
 
 type alias Model =
@@ -36,21 +38,22 @@ type alias Model =
 
 
 type Msg
-    = UpdateEmail String
+    = NoOp
+    | UpdateEmail String
     | UpdatePassword String
     | UpdatePasswordConfirmation String
-    | RequestToken
+    | RequestTokens
     | RequestNewPassword String
     | ReceiveError Error
-    | ReceiveToken String
+    | ReceiveTokens TokenSet
     | ReceiveChallenge String
 
 
 loginResponseToMsg : Result Error CognitoClient.LoginResult -> Msg
 loginResponseToMsg result =
     case result of
-        Ok (LoggedIn token) ->
-            ReceiveToken token
+        Ok (LoggedIn tokens) ->
+            ReceiveTokens tokens
 
         Ok (NewPasswordRequired session) ->
             ReceiveChallenge session
@@ -59,23 +62,25 @@ loginResponseToMsg result =
             ReceiveError e
 
 
-challengeResponseToMsg : Result Error String -> Msg
-challengeResponseToMsg result =
+tokensOrErrorToMsg : Result Error TokenSet -> Msg
+tokensOrErrorToMsg result =
     case result of
-        Ok token ->
-            ReceiveToken token
+        Ok tokens ->
+            ReceiveTokens tokens
 
         Err e ->
             ReceiveError e
 
 
 type alias LoginUpdate =
-    Msg -> Model -> ( ( Model, Cmd Msg ), Maybe String )
+    Msg -> Model -> ( ( Model, Cmd Msg ), Maybe TokenSet )
 
 
 type alias Config =
     { login : Login
     , answerNewPasswordChallenge : AnswerNewPasswordChallenge
+    , refreshSession : RefreshSession
+    , cacheRefreshToken : String -> Cmd ()
     }
 
 
@@ -92,7 +97,7 @@ validateNewPassword password passwordConfirmation =
 
 
 update : Config -> LoginUpdate
-update { login, answerNewPasswordChallenge } msg ({ email, password, passwordConfirmation, loading, lastError } as s) =
+update { login, cacheRefreshToken, answerNewPasswordChallenge } msg ({ email, password, passwordConfirmation, loading, lastError } as s) =
     case ( msg, loading ) of
         ( UpdateEmail new, False ) ->
             ( ( { s | email = new }, Cmd.none ), Nothing )
@@ -103,7 +108,7 @@ update { login, answerNewPasswordChallenge } msg ({ email, password, passwordCon
         ( UpdatePasswordConfirmation new, False ) ->
             ( ( { s | passwordConfirmation = new }, Cmd.none ), Nothing )
 
-        ( RequestToken, False ) ->
+        ( RequestTokens, False ) ->
             ( ( { s | loading = True, lastError = Nothing }
               , Cmd.map loginResponseToMsg <| login email password
               )
@@ -113,7 +118,7 @@ update { login, answerNewPasswordChallenge } msg ({ email, password, passwordCon
         ( RequestNewPassword session, False ) ->
             if validateNewPassword password passwordConfirmation == Nothing then
                 ( ( { s | loading = True, lastError = Nothing }
-                  , Cmd.map challengeResponseToMsg <| answerNewPasswordChallenge session email password
+                  , Cmd.map tokensOrErrorToMsg <| answerNewPasswordChallenge session email password
                   )
                 , Nothing
                 )
@@ -121,7 +126,7 @@ update { login, answerNewPasswordChallenge } msg ({ email, password, passwordCon
             else
                 ( ( s, Cmd.none ), Nothing )
 
-        ( ReceiveToken token, True ) ->
+        ( ReceiveTokens tokens, True ) ->
             ( ( { email = ""
                 , password = ""
                 , passwordConfirmation = ""
@@ -129,9 +134,9 @@ update { login, answerNewPasswordChallenge } msg ({ email, password, passwordCon
                 , lastError = Nothing
                 , session = Nothing
                 }
-              , Cmd.none
+              , Cmd.map (always NoOp) <| cacheRefreshToken tokens.refresh
               )
-            , Just token
+            , Just tokens
             )
 
         ( ReceiveChallenge session, True ) ->
@@ -160,7 +165,7 @@ view { email, password, passwordConfirmation, loading, lastError, session } =
         [ onSubmit <|
             case session of
                 Nothing ->
-                    RequestToken
+                    RequestTokens
 
                 Just s ->
                     RequestNewPassword s
@@ -216,7 +221,7 @@ view { email, password, passwordConfirmation, loading, lastError, session } =
                     "Is your internet connected?"
 
                 Just Timeout ->
-                    "Timeout trying to fetch token"
+                    "Timeout trying to fetch tokens"
 
                 Just (BadBody _) ->
                     "Unexpected response from auth service"

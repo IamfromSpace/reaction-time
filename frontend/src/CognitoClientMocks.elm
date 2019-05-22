@@ -1,6 +1,6 @@
-module CognitoClientMocks exposing (alwaysRequireChangePasswordWithSession, alwaysSucceedChangePasswordWithToken)
+module CognitoClientMocks exposing (alwaysRequireChangePasswordWithSession, alwaysSucceedChangePasswordWithTokens, alwaysSucceedRefreshWithTokens)
 
-import CognitoClient exposing (AnswerNewPasswordChallenge, Login, LoginResult(..))
+import CognitoClient exposing (AnswerNewPasswordChallenge, Login, LoginResult(..), RefreshSession, TokenSet)
 import Task
 
 
@@ -9,6 +9,11 @@ alwaysRequireChangePasswordWithSession session _ _ =
     Task.perform identity <| Task.succeed (Ok (NewPasswordRequired session))
 
 
-alwaysSucceedChangePasswordWithToken : String -> AnswerNewPasswordChallenge
-alwaysSucceedChangePasswordWithToken token _ _ _ =
-    Task.perform identity <| Task.succeed (Ok token)
+alwaysSucceedChangePasswordWithTokens : TokenSet -> AnswerNewPasswordChallenge
+alwaysSucceedChangePasswordWithTokens tokens _ _ _ =
+    Task.perform identity <| Task.succeed (Ok tokens)
+
+
+alwaysSucceedRefreshWithTokens : TokenSet -> RefreshSession
+alwaysSucceedRefreshWithTokens tokens _ =
+    Task.perform identity <| Task.succeed (Ok (LoggedIn tokens))
