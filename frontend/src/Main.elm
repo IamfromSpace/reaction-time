@@ -1,7 +1,7 @@
 port module Main exposing (main)
 
 import App exposing (Model, Msg, initialModel, sub, update, view)
-import Browser exposing (element)
+import Browser exposing (document)
 import CognitoClient exposing (mkAnswerNewPasswordChallenge, mkLogin, mkRefreshSession)
 import Login
 import PomsServerClient
@@ -34,7 +34,7 @@ type alias Flags =
 
 main : Program Flags ( App.Config, Model ) Msg
 main =
-    (element << Utils.configStyle)
+    (document << Utils.configStyle)
         { init =
             \{ refreshToken, rtEndpoint, pomsEndpoint, cognitoClientId, cognitoRegion } ->
                 ( { mkRtTestUpdate =
@@ -46,7 +46,7 @@ main =
                   }
                 , ( initialModel, Cmd.none )
                 )
-        , view = view
+        , view = \m -> { title = "Training", body = [ view m ] }
         , update = update
         , subscriptions = sub
         }
