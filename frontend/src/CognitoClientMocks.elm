@@ -16,4 +16,4 @@ alwaysSucceedChangePasswordWithTokens tokens _ _ _ =
 
 alwaysSucceedRefreshWithTokens : TokenSet -> RefreshSession
 alwaysSucceedRefreshWithTokens tokens _ =
-    Task.perform identity <| Task.succeed (Ok (LoggedIn tokens))
+    Task.perform identity <| Task.succeed (Ok tokens)
