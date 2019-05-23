@@ -23,24 +23,20 @@ mkLoginUpdateConfig region clientId =
     }
 
 
-main : Program (Maybe String) ( App.Config, Model ) Msg
+type alias Flags =
+    { cognitoClientId : String
+    , cognitoRegion : String
+    , pomsEndpoint : String
+    , refreshToken : Maybe String
+    , rtEndpoint : String
+    }
+
+
+main : Program Flags ( App.Config, Model ) Msg
 main =
-    let
-        rtEndpoint =
-            "http://example.com/api/tests/rt"
-
-        pomsEndpoint =
-            "http://example.com/api/tests/poms"
-
-        cognitoClientId =
-            "XXX"
-
-        cognitoRegion =
-            "us-west-2"
-    in
     (element << Utils.configStyle)
         { init =
-            \mRefreshToken ->
+            \{ refreshToken, rtEndpoint, pomsEndpoint, cognitoClientId, cognitoRegion } ->
                 ( { mkRtTestUpdate =
                         RtTest.update 80 << Maybe.map (RtServerClient.reportResult rtEndpoint)
                   , mkPomsTestUpdate =

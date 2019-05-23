@@ -15,7 +15,13 @@ var localStorageKey = 'refreshToken';
 var refreshToken = localStorage.getItem(localStorageKey);
 var app = Elm.Main.init({
   node: document.getElementById("elm-app"),
-  flags: refreshToken
+  flags: {
+    rtEndpoint: "https://example.com",
+    pomsEndpoint: "https://example.com",
+    cognitoClientId: "XXX",
+    cognitoRegion: "us-west-2",
+    refreshToken: refreshToken
+  }
 });
 app.ports.cacheRefreshToken.subscribe(function(token) {
   localStorage.setItem(localStorageKey, token);
