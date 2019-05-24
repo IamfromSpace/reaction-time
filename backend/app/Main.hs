@@ -20,8 +20,10 @@ instance HasLambdaContext Env where
 main :: IO ()
 main = do
   tableName <- pack <$> getEnv "TABLE_NAME"
+  userId <- pack <$> getEnv "USER_ID"
+  topicArn <- pack <$> getEnv "TOPIC_ARN"
   lgr <- newLogger Debug stderr
   env <- newEnv Discover
   runResourceT $
       runAWS (set envLogger lgr env) $
-      mRuntimeWithContext $ handler tableName
+      mRuntimeWithContext $ handler topicArn userId tableName

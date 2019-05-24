@@ -5,24 +5,39 @@
 module Lib
     (handler) where
 
-import           Prelude                                   hiding (lookup)
-import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyRequest (..), authorizer)
+import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyRequest (..),
+                                                            authorizer)
 import           AWS.Lambda.Events.ApiGatewayProxyResponse (ApiGatewayProxyResponse (..),
                                                             textPlain)
-import           Control.Lens                              (set)
-import           Data.HashMap.Strict                       (HashMap, fromList, lookup)
+import           Control.Applicative                       ((<|>))
+import           Control.Lens                              (set, view, (&),
+                                                            (.~))
+import           Control.Monad.Trans                       (liftIO)
+import           Data.HashMap.Strict                       (HashMap, fromList,
+                                                            lookup)
+import           Data.Maybe                                (fromJust)
 import           Data.Text                                 (Text, pack)
 import           Data.Text.Lazy                            (toStrict)
-import           Data.Time.Clock                           (UTCTime)
+import           Data.Time.Clock                           (UTCTime, addUTCTime)
 import           Network.AWS                               (MonadAWS, send)
 import           Network.AWS.DynamoDB.PutItem              (PutItem, piItem,
                                                             putItem)
+import           Network.AWS.DynamoDB.Query                (qExpressionAttributeNames,
+                                                            qExpressionAttributeValues,
+                                                            qKeyConditionExpression,
+                                                            qLimit, qrsCount,
+                                                            query)
 import           Network.AWS.DynamoDB.Types                (AttributeValue,
                                                             attributeValue, avN,
                                                             avS)
+import           Network.AWS.SNS.Publish                   (pMessage, pTopicARN,
+                                                            publish)
+
+import           Prelude                                   hiding (lookup)
 
 import           Control.Monad                             (mzero)
 import           Data.Aeson                                (FromJSON,
+                                                            ToJSON (..),
                                                             Value (Object),
                                                             decode, parseJSON,
                                                             (.:))
@@ -33,6 +48,7 @@ import           Network.HTTP.Types.Status                 (Status (..),
                                                             notImplemented501,
                                                             ok200,
                                                             unauthorized401)
+import           System.IO                                 (hPutStr, stderr)
 
 data RtResult = RtResult
   { averageSeconds :: Float
@@ -117,8 +133,8 @@ toPomsResultItem userId pr@PomsResult { dateTime, tmd, tension, depression, ange
       , ("userId", set avS (Just userId) attributeValue)
       ]
 
-handler :: MonadAWS m => Text -> ApiGatewayProxyRequest UserId -> m ApiGatewayProxyResponse
-handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = lookup "testType" -> Just "rt" } =
+httpHandler :: MonadAWS m => Text -> ApiGatewayProxyRequest UserId -> m ApiGatewayProxyResponse
+httpHandler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = lookup "testType" -> Just "rt"  } =
   case (decode body, authorizer requestContext) of
     (Just rtResult, Just (UserId userId)) -> do
       _ <- send $ putRtResult tableName userId rtResult
@@ -127,7 +143,7 @@ handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "P
       return (ApiGatewayProxyResponse unauthorized401 mempty (textPlain "Unauthorized"))
     (Nothing, _) ->
       return (ApiGatewayProxyResponse badRequest400 mempty (textPlain "Bad Request"))
-handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = lookup "testType" -> Just "poms"  } =
+httpHandler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = lookup "testType" -> Just "poms"   } =
   case (decode body, authorizer requestContext) of
     (Just pomsResult, Just (UserId userId)) -> do
       _ <- send $ putPomsResult tableName userId pomsResult
@@ -136,7 +152,70 @@ handler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "P
       return (ApiGatewayProxyResponse unauthorized401 mempty (textPlain "Unauthorized"))
     (Nothing, _) ->
       return (ApiGatewayProxyResponse badRequest400 mempty (textPlain "Bad Request"))
-handler _ ApiGatewayProxyRequest { httpMethod = "GET" } =
+httpHandler _ ApiGatewayProxyRequest { httpMethod = "GET" } =
   return (ApiGatewayProxyResponse notImplemented501 mempty (textPlain "Not Yet Implemented"))
-handler _ _ =
+httpHandler _ _ =
   return (ApiGatewayProxyResponse methodNotAllowed405 mempty (textPlain "Method Not Allowed"))
+
+data CloudWatchEvent = CloudWatchEvent UTCTime
+
+toReadableTimeStr :: String -> String
+toReadableTimeStr str =
+  let f 'T' = ' '
+      f 'Z' = ' '
+      f c   = c
+  in fmap f str <> "UTC"
+
+instance FromJSON CloudWatchEvent where
+  parseJSON (Object v) =
+    (CloudWatchEvent . read . toReadableTimeStr) <$> v .: "time"
+  parseJSON _ = mzero
+
+
+cronHandler :: MonadAWS m => Text -> Text -> Text -> CloudWatchEvent -> m ()
+cronHandler topicArn userId tableName (CloudWatchEvent time) =
+  let twentyHoursPrior = addUTCTime (-60 * 60 * 20) time
+  in do
+      res <- send $ query tableName
+        & qLimit .~ Just 1
+        & qKeyConditionExpression .~ Just "#userId = :userId AND #dateTime > :dateTime"
+        & qExpressionAttributeNames .~ fromList
+            [ ("#dateTime", "LI")
+            , ("#userId", "userId")
+            ]
+        & qExpressionAttributeValues .~ fromList
+            [ (":dateTime", attributeValue & avS .~ (Just $ (<>) "rt#" $ pack $ show twentyHoursPrior) )
+            , (":userId", attributeValue & avS .~ Just userId )
+            ]
+      let count = fromJust $ view qrsCount res
+      if count > 0 then
+        liftIO $ hPutStr stderr "Records found, no SNS to publish."
+      else do
+        _ <- send $ set pTopicARN (Just topicArn) (publish "Get to it, bro!")
+        return ()
+
+
+data HandlerEvent
+  = HttpEvent (ApiGatewayProxyRequest UserId)
+  | CronEvent CloudWatchEvent
+
+instance FromJSON HandlerEvent where
+  parseJSON v =
+    (HttpEvent <$> parseJSON v) <|> (CronEvent <$> parseJSON v)
+
+data HandlerResponse
+  = HttpResponse ApiGatewayProxyResponse
+  | CronResponse ()
+
+instance ToJSON HandlerResponse where
+  toJSON (HttpResponse x) = toJSON x
+  toJSON (CronResponse x) = toJSON x
+
+--TODO: This whole strategy might be more trouble than it's worth
+--and they should just be two entirely distinct lambdas.
+--They should _at least_ be separated into separate modules.
+handler :: MonadAWS m => Text -> Text -> Text -> HandlerEvent -> m HandlerResponse
+handler topicArn userId tableName event =
+  case event of
+    HttpEvent e -> HttpResponse <$> httpHandler tableName e
+    CronEvent e -> CronResponse <$> cronHandler topicArn userId tableName e

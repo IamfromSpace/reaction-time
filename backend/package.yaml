@@ -23,7 +23,9 @@ dependencies:
 - base >= 4.7 && < 5
 - amazonka
 - amazonka-dynamodb
+- amazonka-sns
 - lens
+- mtl
 - unordered-containers
 - text
 - time
