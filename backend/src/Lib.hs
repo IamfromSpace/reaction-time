@@ -10,8 +10,7 @@ import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyReque
 import           AWS.Lambda.Events.ApiGatewayProxyResponse (ApiGatewayProxyResponse (..),
                                                             textPlain)
 import           Control.Applicative                       ((<|>))
-import           Control.Lens                              (set, view, (&),
-                                                            (.~))
+import           Control.Lens                              (set, view)
 import           Control.Monad.Trans                       (liftIO)
 import           Data.HashMap.Strict                       (HashMap, fromList,
                                                             lookup)
@@ -176,17 +175,20 @@ cronHandler :: MonadAWS m => Text -> Text -> Text -> CloudWatchEvent -> m ()
 cronHandler topicArn userId tableName (CloudWatchEvent time) =
   let twentyHoursPrior = addUTCTime (-60 * 60 * 20) time
   in do
-      res <- send $ query tableName
-        & qLimit .~ Just 1
-        & qKeyConditionExpression .~ Just "#userId = :userId AND #dateTime > :dateTime"
-        & qExpressionAttributeNames .~ fromList
+      res <- send
+        $ set qLimit (Just 1)
+        $ set qKeyConditionExpression (Just "#userId = :userId AND #dateTime > :dateTime")
+        $ set qExpressionAttributeNames (fromList
             [ ("#dateTime", "LI")
             , ("#userId", "userId")
             ]
-        & qExpressionAttributeValues .~ fromList
-            [ (":dateTime", attributeValue & avS .~ (Just $ (<>) "rt#" $ pack $ show twentyHoursPrior) )
-            , (":userId", attributeValue & avS .~ Just userId )
+          )
+        $ set qExpressionAttributeValues (fromList
+            [ (":dateTime", set avS (Just $ (<>) "rt#" $ pack $ show twentyHoursPrior) attributeValue)
+            , (":userId", set avS (Just userId) attributeValue )
             ]
+          )
+        $ query tableName
       let count = fromJust $ view qrsCount res
       if count > 0 then
         liftIO $ hPutStr stderr "Records found, no SNS to publish."
