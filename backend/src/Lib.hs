@@ -16,6 +16,7 @@ import           Control.Lens                              (preview, set, view,
                                                             _2, _Just)
 import           Control.Lens.At                           (at, ix)
 import           Control.Monad.Trans                       (liftIO)
+import           Data.Foldable                             (traverse_)
 import           Data.HashMap.Strict                       (HashMap, fromList,
                                                             lookup)
 import           Data.Maybe                                (fromJust)
@@ -197,36 +198,46 @@ querySubscriptions tableName = do
           (preview (at "LI" . _Just . avS . _Just) hashMap)
   return (preview qrsLastEvaluatedKey res, extractDetails <$> view qrsItems res)
 
+userHasOneTestAfter :: MonadAWS m => Text -> UTCTime -> Text -> Text -> m Bool
+userHasOneTestAfter tableName time userId testType = do
+  res <- send
+    $ set qLimit (Just 1)
+    $ set qKeyConditionExpression (Just "#userId = :userId AND #dateTime > :dateTime")
+    $ set qExpressionAttributeNames (fromList
+        [ ("#dateTime", "LI")
+        , ("#userId", "userId")
+        ]
+      )
+    $ set qExpressionAttributeValues (fromList
+        -- TODO: Query for other test types
+        -- TODO: More general "key to text" strategy
+        [ (":dateTime", set avS (Just $ (<>) (testType <> "#") $ pack $ show time) attributeValue)
+        , (":userId", set avS (Just userId) attributeValue )
+        ]
+      )
+    $ query tableName
+  let count = fromJust $ view qrsCount res
+  return $ count > 0
+
+messageUserIfNeeded :: MonadAWS m => Text -> UTCTime -> Text -> Text -> Text -> m ()
+messageUserIfNeeded tableName time userId topicArn testType = do
+  isUpToDate <- userHasOneTestAfter tableName time userId testType
+  if isUpToDate then
+    liftIO $ hPutStr stderr "Records found, no SNS to publish."
+  else do
+    _ <- send $ set pTopicARN (Just topicArn) (publish "Get to it, bro!")
+    return ()
+
 cronHandler :: MonadAWS m => Text -> CloudWatchEvent -> m ()
 cronHandler tableName (CloudWatchEvent time) =
-  let twentyHoursPrior = addUTCTime (-60 * 60 * 20) time
+  let
+    twentyHoursPrior = addUTCTime (-60 * 60 * 20) time
+    sendNotifications = \(x, y) -> messageUserIfNeeded tableName twentyHoursPrior x y "rt"
   in do
-      --TODO: Continue to follow pagination
-      (_, subs) <- querySubscriptions tableName
-      --TODO: Map over all subscriptions concurrently
-      let (topicArn, userId) = head subs
-      res <- send
-        $ set qLimit (Just 1)
-        $ set qKeyConditionExpression (Just "#userId = :userId AND #dateTime > :dateTime")
-        $ set qExpressionAttributeNames (fromList
-            [ ("#dateTime", "LI")
-            , ("#userId", "userId")
-            ]
-          )
-        $ set qExpressionAttributeValues (fromList
-            -- TODO: Query for other test types
-            -- TODO: More general "key to text" strategy
-            [ (":dateTime", set avS (Just $ (<>) "rt#" $ pack $ show twentyHoursPrior) attributeValue)
-            , (":userId", set avS (Just userId) attributeValue )
-            ]
-          )
-        $ query tableName
-      let count = fromJust $ view qrsCount res
-      if count > 0 then
-        liftIO $ hPutStr stderr "Records found, no SNS to publish."
-      else do
-        _ <- send $ set pTopicARN (Just topicArn) (publish "Get to it, bro!")
-        return ()
+    --TODO: Continue to follow pagination
+    (_, subs) <- querySubscriptions tableName
+    --TODO: This could totally be concurrent, but struggling with the monad transforms
+    traverse_ sendNotifications subs
 
 
 data HandlerEvent
