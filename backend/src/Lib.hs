@@ -193,7 +193,8 @@ querySubscriptions tableName = do
         -- TODO: More include a list of all subscriptions
         fromJust $ liftA2 (,)
           (preview (at "topicArn" . _Just . avS . _Just) hashMap)
-          (preview (at "userId" . _Just . avS . _Just) hashMap)
+          -- Note that the LI for for subscriptions holds the userId
+          (preview (at "LI" . _Just . avS . _Just) hashMap)
   return (preview qrsLastEvaluatedKey res, extractDetails <$> view qrsItems res)
 
 cronHandler :: MonadAWS m => Text -> CloudWatchEvent -> m ()
