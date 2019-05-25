@@ -1,6 +1,8 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE NamedFieldPuns        #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE ViewPatterns          #-}
 module Lib
     (handler) where
@@ -9,8 +11,10 @@ import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyReque
                                                             authorizer)
 import           AWS.Lambda.Events.ApiGatewayProxyResponse (ApiGatewayProxyResponse (..),
                                                             textPlain)
-import           Control.Applicative                       ((<|>))
-import           Control.Lens                              (set, view)
+import           Control.Applicative                       (liftA2, (<|>))
+import           Control.Lens                              (preview, set, view,
+                                                            _2, _Just)
+import           Control.Lens.At                           (at, ix)
 import           Control.Monad.Trans                       (liftIO)
 import           Data.HashMap.Strict                       (HashMap, fromList,
                                                             lookup)
@@ -25,6 +29,8 @@ import           Network.AWS.DynamoDB.Query                (qExpressionAttribute
                                                             qExpressionAttributeValues,
                                                             qKeyConditionExpression,
                                                             qLimit, qrsCount,
+                                                            qrsItems,
+                                                            qrsLastEvaluatedKey,
                                                             query)
 import           Network.AWS.DynamoDB.Types                (AttributeValue,
                                                             attributeValue, avN,
@@ -170,11 +176,34 @@ instance FromJSON CloudWatchEvent where
     (CloudWatchEvent . read . toReadableTimeStr) <$> v .: "time"
   parseJSON _ = mzero
 
+querySubscriptions ::
+  MonadAWS m => Text -> m (Maybe (HashMap Text AttributeValue), [(Text, Text)])
+querySubscriptions tableName = do
+  res <- send
+    $ set qKeyConditionExpression
+        (Just "#primaryKey = :subscriptions")
+    $ set qExpressionAttributeNames
+        -- TODO: The table hash key should probably be named something more generic
+        (fromList [("#primaryKey", "userId")])
+    $ set qExpressionAttributeValues
+        (fromList [(":subscriptions", set avS (Just "subscriptions") attributeValue)])
+    $ query tableName
+  -- TODO: handle decode failure
+  let extractDetails hashMap =
+        -- TODO: More include a list of all subscriptions
+        fromJust $ liftA2 (,)
+          (preview (at "topicArn" . _Just . avS . _Just) hashMap)
+          (preview (at "userId" . _Just . avS . _Just) hashMap)
+  return (preview qrsLastEvaluatedKey res, extractDetails <$> view qrsItems res)
 
-cronHandler :: MonadAWS m => Text -> Text -> Text -> CloudWatchEvent -> m ()
-cronHandler topicArn userId tableName (CloudWatchEvent time) =
+cronHandler :: MonadAWS m => Text -> CloudWatchEvent -> m ()
+cronHandler tableName (CloudWatchEvent time) =
   let twentyHoursPrior = addUTCTime (-60 * 60 * 20) time
   in do
+      --TODO: Continue to follow pagination
+      (_, subs) <- querySubscriptions tableName
+      --TODO: Map over all subscriptions concurrently
+      let (topicArn, userId) = head subs
       res <- send
         $ set qLimit (Just 1)
         $ set qKeyConditionExpression (Just "#userId = :userId AND #dateTime > :dateTime")
@@ -184,6 +213,8 @@ cronHandler topicArn userId tableName (CloudWatchEvent time) =
             ]
           )
         $ set qExpressionAttributeValues (fromList
+            -- TODO: Query for other test types
+            -- TODO: More general "key to text" strategy
             [ (":dateTime", set avS (Just $ (<>) "rt#" $ pack $ show twentyHoursPrior) attributeValue)
             , (":userId", set avS (Just userId) attributeValue )
             ]
@@ -216,8 +247,8 @@ instance ToJSON HandlerResponse where
 --TODO: This whole strategy might be more trouble than it's worth
 --and they should just be two entirely distinct lambdas.
 --They should _at least_ be separated into separate modules.
-handler :: MonadAWS m => Text -> Text -> Text -> HandlerEvent -> m HandlerResponse
-handler topicArn userId tableName event =
+handler :: MonadAWS m => Text -> HandlerEvent -> m HandlerResponse
+handler tableName event =
   case event of
     HttpEvent e -> HttpResponse <$> httpHandler tableName e
-    CronEvent e -> CronResponse <$> cronHandler topicArn userId tableName e
+    CronEvent e -> CronResponse <$> cronHandler tableName e
