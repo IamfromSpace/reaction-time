@@ -15,11 +15,13 @@ import           Control.Applicative                       (liftA2, (<|>))
 import           Control.Lens                              (preview, set, view,
                                                             _2, _Just)
 import           Control.Lens.At                           (at, ix)
+import           Control.Monad                             ((>=>))
 import           Control.Monad.Trans                       (liftIO)
 import           Data.Foldable                             (traverse_)
 import           Data.HashMap.Strict                       (HashMap, fromList,
                                                             lookup)
-import           Data.Maybe                                (fromJust)
+import           Data.Maybe                                (fromJust, fromMaybe)
+import           Data.Set                                  (Set)
 import           Data.Text                                 (Text, pack)
 import           Data.Text.Lazy                            (toStrict)
 import           Data.Time.Clock                           (UTCTime, addUTCTime)
@@ -55,6 +57,19 @@ import           Network.HTTP.Types.Status                 (Status (..),
                                                             ok200,
                                                             unauthorized401)
 import           System.IO                                 (hPutStr, stderr)
+
+data TestType
+  = ReactionTime
+  | POMS
+
+instance Show TestType where
+  show ReactionTime = "rt"
+  show POMS = "poms"
+
+parseTestType :: Text -> Maybe TestType
+parseTestType "rt" = Just ReactionTime
+parseTestType "poms" = Just POMS
+parseTestType _ = Nothing
 
 data RtResult = RtResult
   { averageSeconds :: Float
@@ -113,15 +128,19 @@ toRtResultItem userId RtResult { averageSeconds, successCount, testCount, dateTi
       , ("successCount", set avN (Just $ pack $ show successCount) attributeValue)
       , ("testCount", set avN (Just $ pack $ show testCount) attributeValue)
       , ("dateTimeUTC", set avS (Just $ pack $ show dateTime) attributeValue)
-      , ("testType", set avS (Just "rt") attributeValue)
-      , ("LI", set avS (Just (pack ("rt#" ++ show dateTime))) attributeValue)
-      , ("LSI", set avS (Just (pack (show dateTime ++ "#rt"))) attributeValue)
+      , ("testType", set avS (Just (pack (show ReactionTime))) attributeValue)
+      , ("LI", set avS (Just (pack (show ReactionTime ++ "#" ++ show dateTime))) attributeValue)
+      , ("LSI", set avS (Just (pack (show dateTime ++ "#" ++ show ReactionTime))) attributeValue)
       , ("userId", set avS (Just userId) attributeValue)
       ]
 
 putPomsResult :: Text -> Text -> PomsResult -> PutItem
 putPomsResult tableName userId pomsResult =
   set piItem (toPomsResultItem userId pomsResult) (putItem tableName)
+
+testTypeFromPathParams :: HashMap Text Text -> Maybe TestType
+testTypeFromPathParams =
+  lookup "testType" >=> parseTestType
 
 toPomsResultItem :: Text -> PomsResult -> HashMap Text AttributeValue
 toPomsResultItem userId pr@PomsResult { dateTime, tmd, tension, depression, anger, fatigue, confusion, vigor } =
@@ -133,14 +152,15 @@ toPomsResultItem userId pr@PomsResult { dateTime, tmd, tension, depression, ange
       , ("fatigue", set avN (Just $ pack $ show fatigue) attributeValue)
       , ("confusion", set avN (Just $ pack $ show confusion) attributeValue)
       , ("vigor", set avN (Just $ pack $ show vigor) attributeValue)
-      , ("LI", set avS (Just (pack ("poms#" ++ show dateTime))) attributeValue)
-      , ("LSI", set avS (Just (pack (show dateTime ++ "#poms"))) attributeValue)
+      , ("LI", set avS (Just (pack (show POMS ++ "#" ++ show dateTime))) attributeValue)
+      , ("LSI", set avS (Just (pack (show dateTime ++ "#" ++ show POMS))) attributeValue)
       , ("dateTimeUTC", set avS (Just $ pack $ show dateTime) attributeValue)
+      , ("testType", set avS (Just (pack (show POMS))) attributeValue)
       , ("userId", set avS (Just userId) attributeValue)
       ]
 
 httpHandler :: MonadAWS m => Text -> ApiGatewayProxyRequest UserId -> m ApiGatewayProxyResponse
-httpHandler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = lookup "testType" -> Just "rt"  } =
+httpHandler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = testTypeFromPathParams -> Just ReactionTime } =
   case (decode body, authorizer requestContext) of
     (Just rtResult, Just (UserId userId)) -> do
       _ <- send $ putRtResult tableName userId rtResult
@@ -149,7 +169,7 @@ httpHandler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod 
       return (ApiGatewayProxyResponse unauthorized401 mempty (textPlain "Unauthorized"))
     (Nothing, _) ->
       return (ApiGatewayProxyResponse badRequest400 mempty (textPlain "Bad Request"))
-httpHandler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = lookup "testType" -> Just "poms"   } =
+httpHandler tableName ApiGatewayProxyRequest { requestContext, body, httpMethod = "POST", pathParameters = testTypeFromPathParams -> Just POMS } =
   case (decode body, authorizer requestContext) of
     (Just pomsResult, Just (UserId userId)) -> do
       _ <- send $ putPomsResult tableName userId pomsResult
@@ -198,7 +218,7 @@ querySubscriptions tableName = do
           (preview (at "LI" . _Just . avS . _Just) hashMap)
   return (preview qrsLastEvaluatedKey res, extractDetails <$> view qrsItems res)
 
-userHasOneTestAfter :: MonadAWS m => Text -> UTCTime -> Text -> Text -> m Bool
+userHasOneTestAfter :: MonadAWS m => Text -> UTCTime -> Text -> TestType -> m Bool
 userHasOneTestAfter tableName time userId testType = do
   res <- send
     $ set qLimit (Just 1)
@@ -211,7 +231,7 @@ userHasOneTestAfter tableName time userId testType = do
     $ set qExpressionAttributeValues (fromList
         -- TODO: Query for other test types
         -- TODO: More general "key to text" strategy
-        [ (":dateTime", set avS (Just $ (<>) (testType <> "#") $ pack $ show time) attributeValue)
+        [ (":dateTime", set avS (Just $ pack $ (<>) (show testType <> "#") $ show time) attributeValue)
         , (":userId", set avS (Just userId) attributeValue )
         ]
       )
@@ -219,7 +239,7 @@ userHasOneTestAfter tableName time userId testType = do
   let count = fromJust $ view qrsCount res
   return $ count > 0
 
-messageUserIfNeeded :: MonadAWS m => Text -> UTCTime -> Text -> Text -> Text -> m ()
+messageUserIfNeeded :: MonadAWS m => Text -> UTCTime -> Text -> Text -> TestType -> m ()
 messageUserIfNeeded tableName time userId topicArn testType = do
   isUpToDate <- userHasOneTestAfter tableName time userId testType
   if isUpToDate then
@@ -232,7 +252,7 @@ cronHandler :: MonadAWS m => Text -> CloudWatchEvent -> m ()
 cronHandler tableName (CloudWatchEvent time) =
   let
     twentyHoursPrior = addUTCTime (-60 * 60 * 20) time
-    sendNotifications = \(x, y) -> messageUserIfNeeded tableName twentyHoursPrior x y "rt"
+    sendNotifications = \(x, y) -> messageUserIfNeeded tableName twentyHoursPrior x y ReactionTime
   in do
     --TODO: Continue to follow pagination
     (_, subs) <- querySubscriptions tableName

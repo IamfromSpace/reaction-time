@@ -27,6 +27,7 @@ dependencies:
 - lens
 - mtl
 - unordered-containers
+- containers
 - text
 - time
 - hal
