@@ -11,7 +11,7 @@ import           AWS.Lambda.Events.ApiGatewayProxyRequest  (ApiGatewayProxyReque
                                                             authorizer)
 import           AWS.Lambda.Events.ApiGatewayProxyResponse (ApiGatewayProxyResponse (..),
                                                             textPlain)
-import           Control.Applicative                       (liftA2, (<|>))
+import           Control.Applicative                       ((<|>))
 import           Control.Lens                              (preview, set, view,
                                                             _2, _Just)
 import           Control.Lens.At                           (at, ix)
@@ -22,6 +22,7 @@ import           Data.HashMap.Strict                       (HashMap, fromList,
                                                             lookup)
 import           Data.Maybe                                (fromJust, fromMaybe)
 import           Data.Set                                  (Set)
+import qualified Data.Set                                  as Set
 import           Data.Text                                 (Text, pack)
 import           Data.Text.Lazy                            (toStrict)
 import           Data.Time.Clock                           (UTCTime, addUTCTime)
@@ -37,7 +38,7 @@ import           Network.AWS.DynamoDB.Query                (qExpressionAttribute
                                                             query)
 import           Network.AWS.DynamoDB.Types                (AttributeValue,
                                                             attributeValue, avN,
-                                                            avS)
+                                                            avS, avSS)
 import           Network.AWS.SNS.Publish                   (pMessage, pTopicARN,
                                                             publish)
 
@@ -58,9 +59,13 @@ import           Network.HTTP.Types.Status                 (Status (..),
                                                             unauthorized401)
 import           System.IO                                 (hPutStr, stderr)
 
+class FromDynamoDBItem a where
+  fromItem :: HashMap Text AttributeValue -> Maybe a
+
 data TestType
   = ReactionTime
   | POMS
+  deriving (Eq, Ord)
 
 instance Show TestType where
   show ReactionTime = "rt"
@@ -185,6 +190,19 @@ httpHandler _ _ =
 
 data CloudWatchEvent = CloudWatchEvent UTCTime
 
+data TestsReminderSub = TestsReminderSub
+  { userId :: Text
+  , topicArn :: Text
+  , testTypes :: Set TestType
+  }
+
+instance FromDynamoDBItem TestsReminderSub where
+  fromItem hashMap = TestsReminderSub <$>
+    (view avS =<< lookup "topicArn" hashMap) <*>
+    -- Note that the LI for for subscriptions holds the userId
+    (view avS =<< lookup "LI" hashMap) <*>
+    (Set.fromList <$> (traverse parseTestType . view avSS =<< lookup "testTypes" hashMap))
+
 toReadableTimeStr :: String -> String
 toReadableTimeStr str =
   let f 'T' = ' '
@@ -198,7 +216,7 @@ instance FromJSON CloudWatchEvent where
   parseJSON _ = mzero
 
 querySubscriptions ::
-  MonadAWS m => Text -> m (Maybe (HashMap Text AttributeValue), [(Text, Text)])
+  MonadAWS m => Text -> m (Maybe (HashMap Text AttributeValue), [TestsReminderSub])
 querySubscriptions tableName = do
   res <- send
     $ set qKeyConditionExpression
@@ -210,13 +228,7 @@ querySubscriptions tableName = do
         (fromList [(":subscriptions", set avS (Just "subscriptions") attributeValue)])
     $ query tableName
   -- TODO: handle decode failure
-  let extractDetails hashMap =
-        -- TODO: More include a list of all subscriptions
-        fromJust $ liftA2 (,)
-          (preview (at "topicArn" . _Just . avS . _Just) hashMap)
-          -- Note that the LI for for subscriptions holds the userId
-          (preview (at "LI" . _Just . avS . _Just) hashMap)
-  return (preview qrsLastEvaluatedKey res, extractDetails <$> view qrsItems res)
+  return (preview qrsLastEvaluatedKey res, fromJust . fromItem <$> view qrsItems res)
 
 userHasOneTestAfter :: MonadAWS m => Text -> UTCTime -> Text -> TestType -> m Bool
 userHasOneTestAfter tableName time userId testType = do
@@ -229,7 +241,6 @@ userHasOneTestAfter tableName time userId testType = do
         ]
       )
     $ set qExpressionAttributeValues (fromList
-        -- TODO: Query for other test types
         -- TODO: More general "key to text" strategy
         [ (":dateTime", set avS (Just $ pack $ (<>) (show testType <> "#") $ show time) attributeValue)
         , (":userId", set avS (Just userId) attributeValue )
@@ -239,12 +250,15 @@ userHasOneTestAfter tableName time userId testType = do
   let count = fromJust $ view qrsCount res
   return $ count > 0
 
-messageUserIfNeeded :: MonadAWS m => Text -> UTCTime -> Text -> Text -> TestType -> m ()
-messageUserIfNeeded tableName time userId topicArn testType = do
-  isUpToDate <- userHasOneTestAfter tableName time userId testType
-  if isUpToDate then
+messageUserIfNeeded :: MonadAWS m => Text -> UTCTime -> TestsReminderSub -> m ()
+messageUserIfNeeded tableName time TestsReminderSub { userId, topicArn, testTypes } = do
+  let checkIsTestUpToDate = userHasOneTestAfter tableName time userId
+  -- TODO: We could check each test type concurrently, traverse will be serial
+  areAllUpToDate <- all id <$> traverse checkIsTestUpToDate (Set.toList testTypes)
+  if areAllUpToDate then
     liftIO $ hPutStr stderr "Records found, no SNS to publish."
   else do
+    -- TODO: Send which tests are missing.
     _ <- send $ set pTopicARN (Just topicArn) (publish "Get to it, bro!")
     return ()
 
@@ -252,7 +266,7 @@ cronHandler :: MonadAWS m => Text -> CloudWatchEvent -> m ()
 cronHandler tableName (CloudWatchEvent time) =
   let
     twentyHoursPrior = addUTCTime (-60 * 60 * 20) time
-    sendNotifications = \(x, y) -> messageUserIfNeeded tableName twentyHoursPrior x y ReactionTime
+    sendNotifications = messageUserIfNeeded tableName twentyHoursPrior
   in do
     --TODO: Continue to follow pagination
     (_, subs) <- querySubscriptions tableName
