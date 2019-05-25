@@ -198,9 +198,9 @@ data TestsReminderSub = TestsReminderSub
 
 instance FromDynamoDBItem TestsReminderSub where
   fromItem hashMap = TestsReminderSub <$>
-    (view avS =<< lookup "topicArn" hashMap) <*>
     -- Note that the LI for for subscriptions holds the userId
     (view avS =<< lookup "LI" hashMap) <*>
+    (view avS =<< lookup "topicArn" hashMap) <*>
     (Set.fromList <$> (traverse parseTestType . view avSS =<< lookup "testTypes" hashMap))
 
 toReadableTimeStr :: String -> String
