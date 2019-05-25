@@ -230,19 +230,20 @@ querySubscriptions tableName = do
   -- TODO: handle decode failure
   return (preview qrsLastEvaluatedKey res, fromJust . fromItem <$> view qrsItems res)
 
-userHasOneTestAfter :: MonadAWS m => Text -> UTCTime -> Text -> TestType -> m Bool
-userHasOneTestAfter tableName time userId testType = do
+userHasOneTestBetween :: MonadAWS m => Text -> UTCTime -> UTCTime -> Text -> TestType -> m Bool
+userHasOneTestBetween tableName a b userId testType = do
   res <- send
     $ set qLimit (Just 1)
-    $ set qKeyConditionExpression (Just "#userId = :userId AND #dateTime > :dateTime")
+    $ set qKeyConditionExpression (Just "#userId = :userId AND #testDateTime BETWEEN :testA AND :testB")
     $ set qExpressionAttributeNames (fromList
-        [ ("#dateTime", "LI")
+        [ ("#testDateTime", "LI")
         , ("#userId", "userId")
         ]
       )
     $ set qExpressionAttributeValues (fromList
         -- TODO: More general "key to text" strategy
-        [ (":dateTime", set avS (Just $ pack $ (<>) (show testType <> "#") $ show time) attributeValue)
+        [ (":testA", set avS (Just $ pack $ (<>) (show testType <> "#") $ show a) attributeValue)
+        , (":testB", set avS (Just $ pack $ (<>) (show testType <> "#") $ show b) attributeValue)
         , (":userId", set avS (Just userId) attributeValue )
         ]
       )
@@ -256,9 +257,10 @@ filterByList [] _ = []
 filterByList _ [] = []
 
 messageUserIfNeeded :: MonadAWS m => Text -> UTCTime -> TestsReminderSub -> m ()
-messageUserIfNeeded tableName time TestsReminderSub { userId, topicArn, testTypes = tts } = do
+messageUserIfNeeded tableName now TestsReminderSub { userId, topicArn, testTypes = tts } = do
   let testTypes = Set.toList tts
-  let checkIsTestTypeUpToDate = userHasOneTestAfter tableName time userId
+  let twentyHoursPrior = addUTCTime (-60 * 60 * 20) now
+  let checkIsTestTypeUpToDate = userHasOneTestBetween tableName twentyHoursPrior now userId
   -- TODO: We could check each test type concurrently, traverse will be serial
   isUpToDateListOrdered <- traverse checkIsTestTypeUpToDate testTypes
   let testTypesThatNeedReminders = filterByList (not <$> isUpToDateListOrdered) testTypes
@@ -273,15 +275,11 @@ messageUserIfNeeded tableName time TestsReminderSub { userId, topicArn, testType
       return ()
 
 cronHandler :: MonadAWS m => Text -> CloudWatchEvent -> m ()
-cronHandler tableName (CloudWatchEvent time) =
-  let
-    twentyHoursPrior = addUTCTime (-60 * 60 * 20) time
-    sendNotifications = messageUserIfNeeded tableName twentyHoursPrior
-  in do
-    --TODO: Continue to follow pagination
-    (_, subs) <- querySubscriptions tableName
-    --TODO: This could totally be concurrent, but struggling with the monad transforms
-    traverse_ sendNotifications subs
+cronHandler tableName (CloudWatchEvent time) = do
+  --TODO: Continue to follow pagination
+  (_, subs) <- querySubscriptions tableName
+  --TODO: This could totally be concurrent, but struggling with the monad transforms
+  traverse_ (messageUserIfNeeded tableName time) subs
 
 
 data HandlerEvent
