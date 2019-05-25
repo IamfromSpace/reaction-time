@@ -23,7 +23,7 @@ import           Data.HashMap.Strict                       (HashMap, fromList,
 import           Data.Maybe                                (fromJust, fromMaybe)
 import           Data.Set                                  (Set)
 import qualified Data.Set                                  as Set
-import           Data.Text                                 (Text, pack)
+import           Data.Text                                 (Text, pack, intercalate)
 import           Data.Text.Lazy                            (toStrict)
 import           Data.Time.Clock                           (UTCTime, addUTCTime)
 import           Network.AWS                               (MonadAWS, send)
@@ -250,17 +250,27 @@ userHasOneTestAfter tableName time userId testType = do
   let count = fromJust $ view qrsCount res
   return $ count > 0
 
+filterByList :: [Bool] -> [a] -> [a]
+filterByList (b:bt) (a:at) = if b then a : filterByList bt at else filterByList bt at
+filterByList [] _ = []
+filterByList _ [] = []
+
 messageUserIfNeeded :: MonadAWS m => Text -> UTCTime -> TestsReminderSub -> m ()
-messageUserIfNeeded tableName time TestsReminderSub { userId, topicArn, testTypes } = do
-  let checkIsTestUpToDate = userHasOneTestAfter tableName time userId
+messageUserIfNeeded tableName time TestsReminderSub { userId, topicArn, testTypes = tts } = do
+  let testTypes = Set.toList tts
+  let checkIsTestTypeUpToDate = userHasOneTestAfter tableName time userId
   -- TODO: We could check each test type concurrently, traverse will be serial
-  areAllUpToDate <- all id <$> traverse checkIsTestUpToDate (Set.toList testTypes)
-  if areAllUpToDate then
-    liftIO $ hPutStr stderr "Records found, no SNS to publish."
-  else do
-    -- TODO: Send which tests are missing.
-    _ <- send $ set pTopicARN (Just topicArn) (publish "Get to it, bro!")
-    return ()
+  isUpToDateListOrdered <- traverse checkIsTestTypeUpToDate testTypes
+  let testTypesThatNeedReminders = filterByList (not <$> isUpToDateListOrdered) testTypes
+  case testTypesThatNeedReminders of
+    [] -> liftIO $ hPutStr stderr "Records found for all subcribed types, no SNS to publish."
+    _ -> do
+      let msg =
+            "Get to it, bro!  Need to do: " <>
+            intercalate "," (pack . show <$> testTypesThatNeedReminders) <>
+            "."
+      _ <- send $ set pTopicARN (Just topicArn) $ publish msg
+      return ()
 
 cronHandler :: MonadAWS m => Text -> CloudWatchEvent -> m ()
 cronHandler tableName (CloudWatchEvent time) =
