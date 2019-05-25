@@ -269,7 +269,7 @@ messageUserIfNeeded tableName now TestsReminderSub { userId, topicArn, testTypes
     _ -> do
       let msg =
             "Get to it, bro!  Need to do: " <>
-            intercalate "," (pack . show <$> testTypesThatNeedReminders) <>
+            intercalate " and " (pack . show <$> testTypesThatNeedReminders) <>
             "."
       _ <- send $ set pTopicARN (Just topicArn) $ publish msg
       return ()
