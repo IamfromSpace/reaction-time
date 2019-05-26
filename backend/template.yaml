@@ -30,6 +30,10 @@ Resources:
         Key: !Sub '${AWS::StackName}.zip'
         Version: !Ref CodeVersion
       Events:
+        SendNotifications:
+          Type: Schedule
+          Properties:
+            Schedule: rate(2 hours)
         ApiInteraction:
           Type: Api
           Properties:
