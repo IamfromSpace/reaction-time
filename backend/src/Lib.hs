@@ -57,7 +57,7 @@ import           Network.HTTP.Types.Status                 (Status (..),
                                                             notImplemented501,
                                                             ok200,
                                                             unauthorized401)
-import           System.IO                                 (hPutStr, stderr)
+import           System.IO                                 (hPutStrLn, stderr)
 
 class FromDynamoDBItem a where
   fromItem :: HashMap Text AttributeValue -> Maybe a
@@ -265,7 +265,7 @@ messageUserIfNeeded tableName now TestsReminderSub { userId, topicArn, testTypes
   isUpToDateListOrdered <- traverse checkIsTestTypeUpToDate testTypes
   let testTypesThatNeedReminders = filterByList (not <$> isUpToDateListOrdered) testTypes
   case testTypesThatNeedReminders of
-    [] -> liftIO $ hPutStr stderr "Records found for all subcribed types, no SNS to publish."
+    [] -> liftIO $ hPutStrLn stderr "Records found for all subcribed types, no SNS to publish."
     _ -> do
       let msg =
             "Get to it, bro!  Need to do: " <>
